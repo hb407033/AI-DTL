@@ -35,5 +35,9 @@ targets:
     platform: iOS
     sources:
       - ScholarPadProbeTests
+    settings:
+      base:
+        # 测试 bundle 不需要手写 Info.plist，交给 Xcode 自动生成，否则签名阶段直接报错
+        GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: ScholarPadProbe
