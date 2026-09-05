@@ -1,0 +1,8 @@
+packages:
+  - apps/gate-server
+  - packages/*
+  - tools/*
+
+# pnpm 默认不执行依赖的安装脚本；esbuild 需要脚本落下平台二进制，vitest 才能运行，这里显式放行
+allowBuilds:
+  esbuild: true

@@ -1,0 +1,39 @@
+# 原生 iPad 门禁探针的 XcodeGen 工程定义。.xcodeproj 不入库，改此文件后运行 `xcodegen generate` 重建。
+name: ScholarPadProbe
+options:
+  bundleIdPrefix: com.houbin.aischolar
+  deploymentTarget:
+    iOS: "18.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    TARGETED_DEVICE_FAMILY: "2"
+    CODE_SIGN_STYLE: Automatic
+targets:
+  ScholarPadProbe:
+    type: application
+    platform: iOS
+    sources:
+      - ScholarPadProbe
+    info:
+      path: ScholarPadProbe/Info.plist
+      properties:
+        UILaunchScreen: {}
+        NSMicrophoneUsageDescription: "用于孩子与学习 Agent 进行实时语音互动。"
+        NSLocalNetworkUsageDescription: "用于连接家中的 Mac mini 学习主机。"
+        # 只放开局域网明文连接（阶段 0 家庭局域网 HTTP/WS 决策），不设置全局 NSAllowsArbitraryLoads
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.houbin.aischolar.probe
+  ScholarPadProbeTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - ScholarPadProbeTests
+    dependencies:
+      - target: ScholarPadProbe

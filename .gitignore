@@ -1,0 +1,20 @@
+# 依赖与构建产物
+node_modules/
+dist/
+DerivedData/
+
+# Xcode 生成工程：由 apps/ipad/*/project.yml 经 xcodegen generate 重建，不入库
+*.xcodeproj/
+xcuserdata/
+
+# 真实家庭结果只留本地（录音、PCM、笔迹、家庭环境信息一律不入库）
+validation/results/*
+!validation/results/.gitkeep
+
+# 会话工作目录与本机快照
+.superpowers/
+work/codex-app-server-schema/
+outputs/
+
+# 系统文件
+.DS_Store

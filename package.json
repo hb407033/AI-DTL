@@ -1,0 +1,21 @@
+{
+  "name": "ai-scholar-learning-system",
+  "private": true,
+  "packageManager": "pnpm@11.1.2",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "gate:server": "pnpm --filter @ai-scholar/gate-server start",
+    "gate:codex": "pnpm --filter @ai-scholar/codex-realtime-probe start",
+    "gate:report": "pnpm --filter @ai-scholar/gate-report start"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}
