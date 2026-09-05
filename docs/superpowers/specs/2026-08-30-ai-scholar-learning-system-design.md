@@ -653,6 +653,8 @@ Mac mini 运行：
 - `work/codex-app-server-schema/ClientRequest.json`
 - `work/codex-app-server-schema/ServerNotification.json`
 
+2026-09-06 补注：以上是 `0.144.1` 时的快照。本机 Codex 已升至 `0.153.4`，其 `generate-json-schema` **不再导出任何** `thread/realtime/*` 请求定义（通知反而从 8 个增至 11 个，音频块 `ThreadRealtimeAudioChunk` 形状未变），因此 `work/` 下的旧快照只能作历史参考，不能当作当前契约证据；当前契约以阶段 0 计划 Task 7 Step 3 记录的实测比对与 `rust-v0.153.4` 源码为准，版本再变先重校。
+
 这些接口属于实验性能力，当前不能等同于稳定公开产品契约。第一阶段必须先完成风险验证：
 
 1. 当前 Codex 订阅身份是否可持续建立实时会话；
@@ -991,3 +993,4 @@ Mac mini 运行：
 - `0.1`：完成教学、交互、成长记忆、通用插件、家庭部署和 MVP 范围设计。
 - `0.2`：依据红线评审补充跨轮退出指标、提示预算、状态转换、写入权限、离散证据、差异诊断、幂等、实时预算、前置验证与儿童权利。
 - `0.3`：按用户确认将平板端改为完整原生 Swift App，采用 SwiftUI、PencilKit、AVAudioEngine 与 URLSessionWebSocketTask，取消 PWA 与原生壳回退路线。
+- `0.3.1`（2026-09-06）：11.3 补注 Codex `0.153.4` 的 schema 导出漂移，旧快照降为历史参考。

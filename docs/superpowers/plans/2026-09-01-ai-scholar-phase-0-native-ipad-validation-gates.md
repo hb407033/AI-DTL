@@ -6,7 +6,7 @@
 
 **Architecture:** iPad 端完全原生，不使用 PWA、WebView、Capacitor 或 React Native；SwiftUI 负责界面，PencilKit 保存儿童笔迹，独立 SwiftUI Canvas 显示 Agent 语义对象，AVAudioEngine 负责录音播放和本地打断，URLSessionWebSocketTask 通过家庭局域网明文 WebSocket 连接 Mac mini。Mac mini 使用 Node.js/TypeScript 承载验证网关和 Codex app-server 探针，所有长期档案与真实家庭结果只保存在本地未跟踪目录。阶段 0 不实现 TLS、配对和会话令牌。
 
-**Tech Stack:** Xcode 26.6、Swift 6.3.3、iPadOS 18+、SwiftUI、PencilKit、AVFoundation、CryptoKit、URLSessionWebSocketTask、XCTest、XcodeGen、Node.js 22、pnpm 11、TypeScript、Fastify、Vitest、Codex CLI 0.144.1。
+**Tech Stack:** Xcode 26.6、Swift 6.3.3、iPadOS 18+、SwiftUI、PencilKit、AVFoundation、CryptoKit、URLSessionWebSocketTask、XCTest、XcodeGen、Node.js 22、pnpm 11、TypeScript、Fastify、Vitest、Codex CLI 0.153.4（2026-09-06 接手实测；接手者必须重跑 `codex --version`，版本变化即先按 Task 7 Step 3 重校契约）。
 
 ---
 
@@ -17,6 +17,7 @@
 - iPad 只保存当前验证会话的临时缓存，不保存 Codex 长期凭据和成长档案。
 - 麦克风 PCM 只在内存和实时链路中存在，不进入结果文件。
 - Mac mini 的 Codex app-server 只通过 stdio 或回环地址访问。
+- 阶段 0 的“Mac mini”指承载网关与 Codex 的那台开发 Mac（2026-09-06 为 `houbin-mbp`，MacBook Pro）；iPad 通过它的 `.local` 主机名连接，正式部署再迁到真正的 Mac mini，协议不变。
 - iPad 到 Mac mini 使用 `http://` 与 `ws://`；只允许家庭局域网，不开放公网，不实现 TLS、配对和会话令牌。
 - 儿童数据与模型侧数据保留暂不作为阶段 0 阻断项，长期档案仍只落 Mac mini 本地。
 - Codex 实时验证必须使用 ChatGPT 登录身份；出现 API key 身份即 `BLOCKED`。
@@ -112,7 +113,7 @@
 - Create: `apps/ipad/ScholarPadProbe/ScholarPadProbe/App/ScholarPadProbeApp.swift`
 - Create: `apps/ipad/ScholarPadProbe/ScholarPadProbe/App/ProbeDashboardView.swift`
 
-- [ ] **Step 1：确认并初始化工作分支**
+- [x] **Step 1：确认并初始化工作分支**
 
 Run:
 
@@ -125,7 +126,7 @@ git rev-parse --abbrev-ref HEAD
 
 Expected: 当前目录为 `/Users/houbin/Documents/Codex/2026-08-29/wo-yo`；初始化前不是其他 Git 仓库；最终分支为 `feat/phase-0-native-ipad-gates`。
 
-- [ ] **Step 2：记录本机工具基线**
+- [x] **Step 2：记录本机工具基线**
 
 Run:
 
@@ -138,7 +139,7 @@ pnpm --version
 
 Expected: Xcode `26.6`、Swift `6.3.3`、Node `22.x`、pnpm `11.x`。若版本不同，记录实际值并先验证项目生成和测试命令，不能假装与计划一致。
 
-- [ ] **Step 3：安装可重复生成 Xcode 工程的工具**
+- [x] **Step 3：安装可重复生成 Xcode 工程的工具**
 
 Run:
 
@@ -149,7 +150,7 @@ xcodegen --version
 
 Expected: `xcodegen` 返回版本号。安装只影响开发机，不进入 iPad App。
 
-- [ ] **Step 4：写入 Mac mini 工具工作区**
+- [x] **Step 4：写入 Mac mini 工具工作区**
 
 ```json
 {
@@ -172,6 +173,10 @@ packages:
   - apps/gate-server
   - packages/*
   - tools/*
+
+# pnpm 11 默认拒绝依赖的安装脚本并视为错误；esbuild 需要脚本落下平台二进制，vitest 才能运行
+allowBuilds:
+  esbuild: true
 ```
 
 ```json
@@ -196,9 +201,9 @@ Run:
 pnpm add -Dw typescript vitest tsx @types/node
 ```
 
-Expected: 生成 `pnpm-lock.yaml`，命令退出码为 0。
+Expected: 生成 `pnpm-lock.yaml`，命令退出码为 0。若出现 `ERR_PNPM_IGNORED_BUILDS: esbuild`，说明 `allowBuilds` 未写进 `pnpm-workspace.yaml`（pnpm 11 不再读取 `package.json` 的 `pnpm` 字段），修正后重跑 `pnpm install`。
 
-- [ ] **Step 5：写入 iPad-only 工程定义**
+- [x] **Step 5：写入 iPad-only 工程定义**
 
 ```yaml
 # apps/ipad/ScholarPadProbe/project.yml
@@ -237,11 +242,17 @@ targets:
     platform: iOS
     sources:
       - ScholarPadProbeTests
+    settings:
+      base:
+        # 测试 bundle 交给 Xcode 自动生成 Info.plist，否则 xcodebuild test 在签名阶段报错
+        GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: ScholarPadProbe
 ```
 
-- [ ] **Step 6：创建最小 SwiftUI App**
+`ScholarPadProbeTests/` 目录必须先存在（Task 2 会放入第一个测试文件），否则 `xcodegen generate` 找不到源目录。生成的 `.xcodeproj` 不入库，由 `project.yml` 重建。
+
+- [x] **Step 6：创建最小 SwiftUI App**
 
 ```swift
 // ScholarPadProbeApp.swift
@@ -272,7 +283,7 @@ struct ProbeDashboardView: View {
 }
 ```
 
-- [ ] **Step 7：生成并构建模拟器工程**
+- [x] **Step 7：生成并构建模拟器工程**
 
 Run:
 
@@ -284,7 +295,7 @@ xcodebuild -project ScholarPadProbe.xcodeproj -scheme ScholarPadProbe -destinati
 
 Expected: `** BUILD SUCCEEDED **`。真实 iPad 安装前由用户在 Xcode 中选择自己的 Development Team，不把账号或签名凭据写进仓库。`NSAllowsLocalNetworking` 只用于家庭局域网 `.local` 主机，不设置全局 `NSAllowsArbitraryLoads`。
 
-- [ ] **Step 8：提交工程骨架**
+- [x] **Step 8：提交工程骨架**
 
 ```bash
 git add .gitignore package.json pnpm-workspace.yaml tsconfig.base.json apps/ipad docs
@@ -304,7 +315,7 @@ git commit -m "初始化原生iPad验证工程"
 - Create: `apps/ipad/ScholarPadProbe/ScholarPadProbe/Metrics/MetricRecorder.swift`
 - Test: `apps/ipad/ScholarPadProbe/ScholarPadProbeTests/MetricRecorderTests.swift`
 
-- [ ] **Step 1：创建 TypeScript 契约包**
+- [x] **Step 1：创建 TypeScript 契约包**
 
 先写入包清单、TypeScript 配置和出口文件：
 
@@ -344,7 +355,7 @@ pnpm add --filter @ai-scholar/gate-contracts zod
 
 Expected: 第一条输出以 `/packages/gate-contracts` 结尾，两条命令退出码均为 0；若显示“No projects matched”，先修包清单，不继续安装。
 
-- [ ] **Step 2：先写 Swift 百分位失败测试**
+- [x] **Step 2：先写 Swift 百分位失败测试**
 
 ```swift
 import XCTest
@@ -365,7 +376,7 @@ final class MetricRecorderTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 3：运行测试确认失败**
+- [x] **Step 3：运行测试确认失败**
 
 Run:
 
@@ -375,7 +386,7 @@ xcodebuild -project apps/ipad/ScholarPadProbe/ScholarPadProbe.xcodeproj -scheme 
 
 Expected: FAIL，提示 `MetricSample` 或 `MetricRecorder` 未定义。
 
-- [ ] **Step 4：实现 Swift 指标模型**
+- [x] **Step 4：实现 Swift 指标模型**
 
 ```swift
 import Foundation
@@ -428,11 +439,11 @@ enum MetricRecorder {
 }
 ```
 
-- [ ] **Step 5：在 TypeScript 侧实现相同 nearest-rank 契约**
+- [x] **Step 5：在 TypeScript 侧实现相同 nearest-rank 契约**
 
 TypeScript 的 `MetricName` 字面量必须与 Swift raw value 完全一致。Vitest 用同一组 1...20 样本断言 P50=10、P95=19、successCount=19，防止跨端报告算法漂移。
 
-- [ ] **Step 6：运行 Swift 与 TypeScript 测试**
+- [x] **Step 6：运行 Swift 与 TypeScript 测试**
 
 Run:
 
@@ -443,7 +454,7 @@ pnpm vitest run packages/gate-contracts/test/metrics.test.ts
 
 Expected: 两端测试均通过。
 
-- [ ] **Step 7：提交指标契约**
+- [x] **Step 7：提交指标契约**
 
 ```bash
 git add apps/ipad/ScholarPadProbe packages/gate-contracts package.json pnpm-lock.yaml
@@ -774,9 +785,17 @@ Expected: 第一条输出以 `/tools/codex-realtime-probe` 结尾，两条命令
 
 - [ ] **Step 3：固定与本机版本匹配的实验协议契约**
 
-先运行 `codex --version`。本计划基线是 `codex-cli 0.144.1`，对应 OpenAI Codex 仓库标签 `rust-v0.144.1` 的 `app-server-protocol/src/protocol/v2/realtime.rs`。把当前用到的最小请求和通知类型写入 `realtime-contract.ts`；不得从 `main` 分支复制，也不得假设生成 schema 已包含全部实验请求。
+先运行 `codex --version`。本计划基线是 `codex-cli 0.153.4`（2026-09-06 接手实测），对应 OpenAI Codex 仓库标签 `rust-v0.153.4` 的 `app-server-protocol/src/protocol/v2/realtime.rs`。把当前用到的最小请求和通知类型写入 `realtime-contract.ts`；不得从 `main` 分支复制，也不得假设生成 schema 已包含全部实验请求。
 
-本机 `0.144.1` 已验证：`generate-json-schema` 会生成 realtime 通知结构，但没有导出 `thread/realtime/start`、`appendAudio` 等实验客户端请求定义。因此 `snapshot-codex-schema.sh` 除保存 schema 与 SHA-256 外，还必须记录 `codex --version`；若版本不等于契约记录版本，探针直接 `BLOCKED`，先升级契约和测试，不能带着旧类型继续运行。
+2026-09-06 对 `0.153.4` 与旧快照 `0.144.1` 的实测比对（v2 聚合 schema SHA-256 `d3eace08be5dca386bfd1f1e8df650058b4113f1e10870a284d775d75517576a`）：
+
+- `0.153.4` 的 `ClientRequest.json` **不再导出任何** `thread/realtime/*` 请求方法（`0.144.1` 导出 6 个：start/stop/appendAudio/appendSpeech/appendText/listVoices）；但 `listVoices` 在 `0.153.4` 运行时实测可用，说明方法存在、只是生成器不导出实验请求。`work/codex-app-server-schema/` 是 `0.144.1` 旧快照，是本地唯一含 `start/appendAudio` 参数形状的文件，**只能当历史参考**，不得当作当前契约证据。
+- 通知从 8 个增至 11 个：新增 `thread/realtime/item/started`、`item/completed`、`item/transcript/delta`（旧版只有 `itemAdded`）。`realtime-contract.ts` 必须覆盖新通知，否则探针会把它们当未知消息丢弃。
+- `ThreadRealtimeAudioChunk`（`data` base64 / `sampleRate` / `numChannels` / `samplesPerChannel` / `itemId`）两版形状一致，Task 8 的 `appendAudio` 载荷写法仍有效。
+- `ThreadRealtimeStartTransport` 有 `websocket` / `webrtc` / `existingCall` 三种；新增 `ThreadRealtimeInitialItem`（"realtime V3 session"），`start` 参数形状需以 `rust-v0.153.4` 源码为准。
+- `account/read`、`account/rateLimits/read`、`thread/start`、`initialize` 在 `0.153.4` 均存在。
+
+因此 `snapshot-codex-schema.sh` 除保存 schema 与 SHA-256 外，还必须记录 `codex --version`；若版本不等于契约记录版本，探针直接 `BLOCKED`，先升级契约和测试，不能带着旧类型继续运行。
 
 - [ ] **Step 4：实现无 shell 的 stdio 客户端**
 
@@ -816,10 +835,10 @@ Expected: 第一条输出以 `/tools/codex-realtime-probe` 结尾，两条命令
 ```bash
 pnpm vitest run tools/codex-realtime-probe/test/app-server-client.test.ts
 bash scripts/snapshot-codex-schema.sh
-codex features list | rg '^realtime_conversation\s+under development\s+false$'
+codex features list | rg '^realtime_conversation\s+under development\s+(true|false)$'
 ```
 
-Expected: 单元测试通过；schema 有 SHA-256；快照中的 Codex 版本与 `realtime-contract.ts` 记录版本一致；功能仍明确标记为 under development 且默认关闭。默认关闭是预期状态，探针进程通过 `--enable` 只为当前启动临时开启，不修改用户全局配置。
+Expected: 单元测试通过；schema 有 SHA-256；快照中的 Codex 版本与 `realtime-contract.ts` 记录版本一致；功能仍明确标记为 under development。**不要求它为 `false`**：本机 2026-09-06 实测已全局开启为 `true`（见交接第 5 节），把 `false` 写成通过条件会让预检在本机必败。探针进程仍显式传 `--enable realtime_conversation`，使启动不依赖用户全局配置；客户端 `experimentalApi: true` 任何情况下都不能省。
 
 - [ ] **Step 8：提交 Codex 探针**
 
