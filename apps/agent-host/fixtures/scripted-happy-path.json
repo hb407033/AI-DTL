@@ -1,0 +1,7 @@
+{
+  "scriptVersion": 1,
+  "turns": [
+    { "purpose": "hint", "proposal": { "proposalId": "s-1", "spokenResponse": "你现在已经确定了什么？", "learnerTask": "说说你已经确定的部分", "canvasActions": [], "expectedEvidence": ["magnitude_estimate"], "hintLevel": 1 } },
+    { "purpose": "hint", "proposal": { "proposalId": "s-2", "spokenResponse": "0.3 还能换成什么说法？", "learnerTask": "换一种说法说说 0.3", "canvasActions": [], "expectedEvidence": ["tenths_meaning"], "hintLevel": 2 } }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "steps": [
+    { "atMs": 5000, "payload": { "type": "ANSWER", "text": "7.2" } },
+    { "atMs": 9000, "payload": { "type": "HELP_REQUEST" } },
+    { "atMs": 20000, "payload": { "type": "UTTERANCE", "text": "我觉得结果应该比 2.4 小" } },
+    { "atMs": 30000, "payload": { "type": "HELP_REQUEST" } },
+    { "atMs": 45000, "payload": { "type": "UTTERANCE", "text": "0.3 就是十分之三" } },
+    { "atMs": 60000, "payload": { "type": "ANSWER", "text": "0.72" } },
+    { "atMs": 80000, "payload": { "type": "EXPLAIN", "text": "因为 0.3 是十分之三，乘完只剩十分之三那么多，所以比 2.4 小" } },
+    { "atMs": 100000, "payload": { "type": "ANSWER", "text": "1.4" } }
+  ]
+}
