@@ -61,11 +61,13 @@
 
 **测试**：`growth/evidence-fold.test.ts`（19–24）、`growth/hypothesis-lifecycle.test.ts`（25–34）、`plugin-contract` 与 `plugin-math`（169–178）
 
-- [ ] Step 1：先改插件契约与两个插件，跑 `plugin-contract` 与 `plugin-math` 到绿（此步不碰账本）
-- [ ] Step 2：写 `evidence-fold.test.ts`（19–24），确认红；实现 `evidence-fold.ts` 到绿
-- [ ] Step 3：写 `hypothesis-lifecycle.test.ts`（25–34），确认红；实现 `hypothesis.ts` 到绿
-- [ ] Step 4：实现 `run-recorder.ts` 与 `growth-sqlite.ts` 建表；`RunRecorder` 的清零口径按 §10.3（`beginRun` 在每次 `challengeValidated` 调用，含软着陆路径）
-- [ ] Step 5：全绿并提交「实现证据链接、离散摘要与假设生命周期」
+- [x] Step 1：先改插件契约与两个插件，跑 `plugin-contract` 与 `plugin-math` 到绿（此步不碰账本）
+- [x] Step 2：写 `evidence-fold.test.ts`（19–24），确认红；实现 `evidence-fold.ts` 到绿
+- [x] Step 3：写 `hypothesis-lifecycle.test.ts`（25–34），确认红；实现 `hypothesis.ts` 到绿
+- [x] Step 4：实现 `run-recorder.ts` 与 `growth-sqlite.ts` 建表；`RunRecorder` 的清零口径按 §10.3（`beginRun` 在每次 `challengeValidated` 调用，含软着陆路径）
+- [x] Step 5：全绿并提交「实现证据链接、离散摘要与假设生命周期」
+
+**批 2 回写（2026-09-06）**：✅ 完成，全仓 260 个测试通过。⚠️ 建表已在批 1 一次做完（26 张成长表随会话表同库建好），本批只写纯逻辑。⚠️ `DiscreteCounts` 从儿童版文案模块挪到 `growth/types.ts`，避免重复导出。⚠️ 设计稿未定义 `KnownRecordRef` 与 `DueReview`，按用途补了最小形状。⚠️ 数学插件的探针归类要先判否定词：「不用检查了」里也含「检查」。
 
 ## 批 3：三档门禁与档 2 闭环
 

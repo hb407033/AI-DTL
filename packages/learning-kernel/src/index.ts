@@ -21,3 +21,4 @@ export * from "./growth/constants.js";
 export * from "./growth/types.js";
 export * from "./growth/evidence-fold.js";
 export * from "./growth/hypothesis.js";
+export * from "./growth/run-recorder.js";
