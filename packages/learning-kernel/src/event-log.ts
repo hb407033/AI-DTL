@@ -9,6 +9,8 @@ export interface StoredEvent {
   serverSeq: number;
   receivedAt: number;
   contentHash: string;
+  /** 服务端填的作品版本归属；删除级联靠它判定「这条事件属不属于这件作品」 */
+  artifactVersionId?: string | undefined;
 }
 
 export type AppendResult =

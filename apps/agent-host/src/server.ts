@@ -7,7 +7,7 @@ import { join } from "node:path";
 import websocket from "@fastify/websocket";
 import Fastify from "fastify";
 import { z } from "zod";
-import { InMemorySessionStore, ScriptedReplayBridge, SqliteSessionStore, type ReplayScript, type SessionStore } from "@ai-scholar/learning-kernel";
+import { InMemorySessionStore, ScriptedReplayBridge, SqliteSessionStore, openLearningDatabase, type LearningDatabase, type ReplayScript, type SessionStore } from "@ai-scholar/learning-kernel";
 import { mathPlugin } from "@ai-scholar/plugin-math";
 import { canvasActionSchema } from "@ai-scholar/session-contracts";
 import { createSessionHost } from "./session-gateway.js";
@@ -34,17 +34,19 @@ const parentInputSchema = z.object({
   canvasActions: z.array(canvasActionSchema).optional(),
 });
 
-function openStore(dataDir: string | null | undefined): SessionStore {
-  if (dataDir === null) return new InMemorySessionStore();
+/** 会话库与成长库同库同连接：删除一件作品要跨两侧原子完成，跨连接没有事务 */
+function openStore(dataDir: string | null | undefined): { store: SessionStore; db: LearningDatabase | null } {
+  if (dataDir === null) return { store: new InMemorySessionStore(), db: null };
   const dir = dataDir ?? process.env.AI_SCHOLAR_DATA_DIR ?? join(homedir(), ".ai-scholar");
   mkdirSync(dir, { recursive: true });
-  return new SqliteSessionStore(join(dir, "agent-host.sqlite"));
+  const db = openLearningDatabase(join(dir, "agent-host.sqlite"));
+  return { store: new SqliteSessionStore(db), db };
 }
 
 export async function buildHostServer(options: HostServerOptions) {
   const app = Fastify({ logger: { level: "info" } });
   await app.register(websocket);
-  const store = openStore(options.dataDir);
+  const { store, db } = openStore(options.dataDir);
   const host = createSessionHost({
     plugin: mathPlugin, store, clock: () => Date.now(),
     makeBridge: (sessionId) => (options.bridge === "parent" ? host.parentBridge(sessionId) : new ScriptedReplayBridge(options.script ?? { scriptVersion: 1, turns: [] })),
@@ -87,7 +89,7 @@ export async function buildHostServer(options: HostServerOptions) {
   app.post("/parent/sessions/:id/tick", async (request) => { await host.tick((request.params as { id: string }).id, Date.now()); return { ok: true }; });
 
   const interval = setInterval(() => { for (const id of host.sessionIds()) void host.tick(id, Date.now()); }, options.tickIntervalMs ?? 1_000);
-  app.addHook("onClose", async () => { clearInterval(interval); if (store instanceof SqliteSessionStore) store.close(); });
+  app.addHook("onClose", async () => { clearInterval(interval); db?.close(); });
   return app;
 }
 

@@ -13,3 +13,7 @@ export * from "./store.js";
 export * from "./sqlite-store.js";
 export * from "./orchestrator.js";
 export * from "./transcript-confirmation.js";
+export * from "./growth/database.js";
+export * from "./growth/discrete-guard.js";
+export * from "./growth/forbidden-labels.js";
+export * from "./growth/child-text.js";

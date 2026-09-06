@@ -1,7 +1,7 @@
 // packages/learning-kernel/src/store.ts
 // 会话存储接口与内存实现。宿主用 SQLite 实现，测试用内存实现，两者跑同一套契约测试。
 // 只存事件、出站消息（供重放幂等）、提案裁决与快照；长期成长记录不在这里（阶段 1 不实现 GrowthLedgerService）。
-import type { ChildOutbound, SemanticObject, TeachingProposal } from "@ai-scholar/session-contracts";
+import type { ChildOutbound, EvidenceQuality, SemanticObject, TeachingProposal } from "@ai-scholar/session-contracts";
 import type { DisciplineEvidence, LearningChallenge } from "./challenge.js";
 import type { StoredEvent } from "./event-log.js";
 import type { SessionContext } from "./session-state.js";
@@ -44,8 +44,13 @@ export interface SessionSnapshot {
 export interface SessionStore {
   createSession(record: SessionRecord): void;
   getSession(sessionId: string): SessionRecord | null;
-  appendEvent(sessionId: string, stored: StoredEvent): void;
+  /** artifactVersionId 是服务端列：每条事件（含纯语音转写）都要有可解析的作品版本归属，删除级联靠它判定 */
+  appendEvent(sessionId: string, stored: StoredEvent, artifactVersionId?: string | undefined): void;
   listEvents(sessionId: string): StoredEvent[];
+  /** 有效质量 = 原始质量叠加后续确认；只有 confirmed / corrected 能参与证据计数 */
+  effectiveQualityOf(sessionId: string, eventId: string): EvidenceQuality;
+  /** 旧库迁移：只补没有作品版本外键的行，返回补了几条 */
+  backfillArtifactVersion(sessionId: string, artifactVersionId: string): number;
   saveOutbound(sessionId: string, eventId: string, messages: ChildOutbound[]): void;
   getOutbound(sessionId: string, eventId: string): ChildOutbound[] | null;
   saveProposal(sessionId: string, record: ProposalRecord): void;
@@ -67,13 +72,41 @@ export class InMemorySessionStore implements SessionStore {
   private readonly outbound = new Map<string, ChildOutbound[]>();
   private readonly proposals = new Map<string, ProposalRecord[]>();
   private readonly snapshots = new Map<string, SessionSnapshot[]>();
+  private readonly confirmations = new Map<string, { confirmed: boolean; corrected: boolean }>();
 
   createSession(record: SessionRecord): void { this.sessions.set(record.sessionId, record); }
   getSession(sessionId: string): SessionRecord | null { return this.sessions.get(sessionId) ?? null; }
-  appendEvent(sessionId: string, stored: StoredEvent): void {
+  appendEvent(sessionId: string, stored: StoredEvent, artifactVersionId?: string | undefined): void {
     const bucket = this.events.get(sessionId) ?? new Map<string, StoredEvent>();
-    if (!bucket.has(stored.event.eventId)) bucket.set(stored.event.eventId, stored);
+    if (!bucket.has(stored.event.eventId)) {
+      bucket.set(stored.event.eventId, artifactVersionId === undefined ? stored : { ...stored, artifactVersionId });
+    }
     this.events.set(sessionId, bucket);
+    const payload = stored.event.payload;
+    if (payload.type === "CONFIRM_TRANSCRIPT") {
+      this.confirmations.set(`${sessionId}/${payload.targetEventId}`, { confirmed: payload.confirmed, corrected: payload.correctedText !== undefined });
+    }
+  }
+
+  effectiveQualityOf(sessionId: string, eventId: string): EvidenceQuality {
+    const stored = this.events.get(sessionId)?.get(eventId);
+    if (!stored) return "unconfirmed";
+    const decision = this.confirmations.get(`${sessionId}/${eventId}`);
+    if (!decision) return stored.event.quality;
+    if (!decision.confirmed) return "unconfirmed";
+    return decision.corrected ? "corrected" : "confirmed";
+  }
+
+  backfillArtifactVersion(sessionId: string, artifactVersionId: string): number {
+    const bucket = this.events.get(sessionId);
+    if (!bucket) return 0;
+    let filled = 0;
+    for (const [id, stored] of bucket) {
+      if (stored.artifactVersionId !== undefined) continue;
+      bucket.set(id, { ...stored, artifactVersionId });
+      filled += 1;
+    }
+    return filled;
   }
   listEvents(sessionId: string): StoredEvent[] { return [...(this.events.get(sessionId)?.values() ?? [])].sort((a, b) => a.serverSeq - b.serverSeq); }
   saveOutbound(sessionId: string, eventId: string, messages: ChildOutbound[]): void { this.outbound.set(`${sessionId}/${eventId}`, messages); }
