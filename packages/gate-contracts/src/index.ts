@@ -2,3 +2,4 @@
 export * from "./metrics.js";
 export * from "./schemas.js";
 export * from "./probe-protocol.js";
+export * from "./gate-rules.js";

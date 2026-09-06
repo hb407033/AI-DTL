@@ -1,7 +1,7 @@
 // 门禁指标的数据模型。rawValue 即 Mac 端 packages/gate-contracts 的 METRIC_NAMES 字面量，两端不得各自改名。
 import Foundation
 
-enum MetricName: String, Codable {
+enum MetricName: String, Codable, CaseIterable {
     case penRender = "pen_render_ms"
     case localInterrupt = "local_interrupt_ms"
     case lanAck = "lan_ack_ms"

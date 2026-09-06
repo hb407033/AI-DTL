@@ -1,0 +1,14 @@
+{
+  "name": "@ai-scholar/gate-report",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/evaluate.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-scholar/gate-contracts": "workspace:*",
+    "zod": "^4.5.4"
+  }
+}

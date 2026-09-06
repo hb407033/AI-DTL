@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "runId": "device-2026-09-06T12-00-00Z-abcd1234",
+  "deviceModel": "iPad Pro 13-inch (M5)",
+  "systemVersion": "26.5",
+  "appBuild": "1",
+  "transport": "ws-local",
+  "samples": [
+    { "metric": "pen_render_ms", "elapsedMs": 12.5, "success": true },
+    { "metric": "local_interrupt_ms", "elapsedMs": 130, "success": true },
+    { "metric": "lan_ack_ms", "elapsedMs": 5000, "success": false }
+  ],
+  "slowMotionSpotChecks": [
+    { "note": "240fps 慢动作第 1 次", "estimatedMs": 25 }
+  ]
+}

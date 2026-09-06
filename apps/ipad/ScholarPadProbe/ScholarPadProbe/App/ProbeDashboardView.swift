@@ -27,6 +27,8 @@ struct ProbeDashboardView: View {
                 .tabItem { Label("音频", systemImage: "waveform") }
             NetworkProbeView(socket: socket, store: store)
                 .tabItem { Label("网络", systemImage: "network") }
+            ReportView(store: store)
+                .tabItem { Label("报告", systemImage: "doc.text") }
         }
     }
 
