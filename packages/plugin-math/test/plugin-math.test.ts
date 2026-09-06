@@ -69,3 +69,51 @@ describe("讲回与迁移", () => {
     expect(parseNumbers("大概 0.7 或者 0.72 吧")).toEqual([0.7, 0.72]);
   });
 });
+
+describe("成长记忆层要求的插件数据（设计稿 §1）", () => {
+  test("难度带有序且挑战落在表里，脚手架点据此固化下标", () => {
+    expect(mathPlugin.manifest.difficultyBands).toEqual(["lower", "base", "upper"]);
+    expect(mathPlugin.manifest.difficultyBands.indexOf(challenge.difficultyBand)).toBeGreaterThanOrEqual(0);
+  });
+
+  test("学科专有的贬义说法放在插件里，内核词表不含学科名", () => {
+    expect(mathPlugin.manifest.forbiddenClaimPatterns.some((p) => p.includes("数学"))).toBe(true);
+  });
+
+  test("五类根因每条都有儿童版猜想，孩子看到的整句来自这里", () => {
+    expect(mathPlugin.manifest.hypothesisCatalog.map((h) => h.id).sort()).toEqual([...MATH_HYPOTHESES].sort());
+    for (const h of mathPlugin.manifest.hypothesisCatalog) {
+      expect(h.childFacingGuess.length).toBeGreaterThan(0);
+      expect([...h.childFacingGuess].length).toBeLessThanOrEqual(40);
+      expect(h.childFacingGuess).not.toMatch(/断点|gap/);   // 不能把内部术语端给孩子
+    }
+  });
+
+  test("发展目标的儿童版说法与目录一致，表面情境键随数字变、儿童版说法不变", () => {
+    const goal = mathPlugin.manifest.developmentGoals.find((g) => g.id === challenge.developmentGoalId);
+    expect(goal?.childFacingGoalPhrase).toBe(challenge.childFacingGoalPhrase);
+    const transfer = mathPlugin.createTransfer(challenge);
+    expect(transfer.surfaceContextKey).not.toBe(challenge.surfaceContextKey);
+    expect(transfer.probeFamilyId).toBe(challenge.probeFamilyId);
+  });
+
+  test("证据带表面情境键；算对之前判断过会变小、之后改对了算一次自我修正", () => {
+    const magnitude = mathPlugin.interpretEvent(challenge, say("UTTERANCE", "会比 2.4 小"), []);
+    expect(magnitude[0]?.surfaceContextKey).toBe(challenge.surfaceContextKey);
+    expect(magnitude[0]?.selfCorrection).toBe(false);
+    const history = [...magnitude, ...mathPlugin.interpretEvent(challenge, say("ANSWER", "7.2"), magnitude)];
+    const corrected = mathPlugin.interpretEvent(challenge, say("ANSWER", "0.72"), history);
+    expect(corrected[0]?.selfCorrection).toBe(true);
+  });
+
+  test("三个探针的每个回答类别都有能被归回去的样例，否定回答不被误判", () => {
+    for (const probe of mathPlugin.discriminatingProbes(challenge)) {
+      for (const [outcome, samples] of Object.entries(probe.samples)) {
+        for (const sample of samples) expect(mathPlugin.classifyProbeOutcome(probe, sample)).toBe(outcome);
+      }
+    }
+    const selfCheck = mathPlugin.discriminatingProbes(challenge).find((p) => p.id === "self-check")!;
+    expect(mathPlugin.classifyProbeOutcome(selfCheck, "不用检查了")).toBe("noCheck");
+    expect(mathPlugin.classifyProbeOutcome(selfCheck, "嗯")).toBeNull();
+  });
+});

@@ -22,7 +22,7 @@ describe("插件注册表", () => {
   test("契约检查能抓住不分辨假设的探针", () => {
     const broken: DisciplinePlugin = {
       ...fakePlugin,
-      discriminatingProbes: () => [{ id: "p", question: "?", outcomes: { a: [{ hypothesisId: "h1", direction: "supports" }], b: [{ hypothesisId: "h1", direction: "supports" }] } }],
+      discriminatingProbes: () => [{ id: "p", question: "会大还是会小？", outcomes: { a: [{ hypothesisId: "h1", direction: "supports" }], b: [{ hypothesisId: "h1", direction: "supports" }] }, samples: { a: ["大"], b: ["小"] } }],
     };
     expect(runPluginContract(broken).find((c) => c.name === "discriminatingProbesSeparateHypotheses")?.pass).toBe(false);
   });

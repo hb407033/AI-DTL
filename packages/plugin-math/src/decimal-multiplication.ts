@@ -30,6 +30,10 @@ function buildChallenge(p: DecimalProduct, id: string, input: ChallengeInput): L
     probeFamilyId: input.probeFamilyId ?? "decimal-times-tenths",
     difficultyBand: p.band,
     developmentGoal: "把小数乘法从规则变成大小直觉、位值意义与可校验的解释",
+    developmentGoalId: "decimal-times-tenths-why",
+    childFacingGoalPhrase: "说清楚结果为什么会变小",
+    surfaceContextKey: `${fmt(p.a)}x${fmt(p.b)}`,
+    surfaceContextLabel: "换了数字的这种题",
     learnerPrompt: `${expr}，结果大概是多少？先在画布上画出或说出你的想法。`,
     availableTools: ["tenthsBar", "numberLine", "label", "arrow", "highlight", "areaModel"],
     independencePolicy: { initialWindowMs: 30_000, hardCapMs: 240_000 },
@@ -59,7 +63,12 @@ function hasMagnitudeEvidence(history: DisciplineEvidence[]): boolean {
 
 function interpretText(challenge: LearningChallenge, event: EvidenceEvent, text: string, history: DisciplineEvidence[]): DisciplineEvidence[] {
   const p = productOf(challenge);
-  const base = { evidenceId: `ev-${event.eventId}`, eventId: event.eventId };
+  const base = {
+    evidenceId: `ev-${event.eventId}`, eventId: event.eventId,
+    surfaceContextKey: challenge.surfaceContextKey,
+    // 已经判断过结果会变小、又自己把错答案改成对的，算一次自我修正
+    selfCorrection: hasMagnitudeEvidence(history) && history.some((e) => e.kind === "wrong_answer"),
+  };
   const tenths = Math.round(p.b * 10);
   const meaning = new RegExp(`十分之${["零","一","二","三","四","五","六","七","八","九"][tenths] ?? ""}|${tenths}\\s*个\\s*0\\.1|${tenths}/10`);
   if (meaning.test(text)) return [{ ...base, kind: "tenths_meaning", summary: `把 ${fmt(p.b)} 说成十分之几`, hypothesisSupport: [{ hypothesisId: "representation_gap", direction: "weakens" }] }];
@@ -83,6 +92,29 @@ function interpretText(challenge: LearningChallenge, event: EvidenceEvent, text:
   return [{ ...base, kind: "utterance", summary: text.slice(0, 40), hypothesisSupport: [] }];
 }
 
+/** 把孩子对探针的回答归类。归不上返回 null，不硬猜。 */
+function classifyProbeOutcome(probe: DiscriminatingProbe, text: string): string | null {
+  switch (probe.id) {
+    case "magnitude-first":
+      if (/小|少|变小/.test(text) && !/大/.test(text)) return "smaller";
+      if (/大|多|变大/.test(text) && !/小/.test(text)) return "larger";
+      return null;
+    case "self-check":
+      // 先判否定：「不用检查了」里也有「检查」两个字
+      if (/不用|不想|没检查|不检查|没错|就这样/.test(text)) return "noCheck";
+      return /检查|再算|应该是|重新|算错/.test(text) ? "selfCorrects" : null;
+    case "no-decimal-point": {
+      const expected = Object.keys(probe.outcomes).includes("correct") ? parseNumbers(probe.samples.correct?.[0] ?? "")[0] : undefined;
+      if (expected === undefined) return null;
+      const answered = parseNumbers(text);
+      if (answered.length === 0) return /不知道|不会/.test(text) ? "wrong" : null;
+      return answered.some((n) => Math.abs(n - expected) < 1e-9) ? "correct" : "wrong";
+    }
+    default:
+      return null;
+  }
+}
+
 export const mathPlugin: DisciplinePlugin = {
   manifest: {
     id: "math",
@@ -92,6 +124,17 @@ export const mathPlugin: DisciplinePlugin = {
     thinkingMoves: ["conjecture", "model", "experiment", "argue", "verify", "transfer"],
     artifactTypes: ["canvas", "explainBack"],
     curriculumVersions: ["人教版五上/小数乘法"],
+    difficultyBands: ["lower", "base", "upper"],
+    // 学科专有的贬义说法放在插件里：内核词表不许出现学科名
+    forbiddenClaimPatterns: ["数感差", "不擅长数学", "计算能力弱", "位值(概念)?(差|没有)"],
+    hypothesisCatalog: [
+      { id: "representation_gap", childFacingGuess: "你可能还没把题目里的话变成算式", parentFacingLabel: "数学表征断点" },
+      { id: "intuition_gap", childFacingGuess: "你可能还不确定结果会变大还是变小", parentFacingLabel: "数学直觉断点" },
+      { id: "strategy_gap", childFacingGuess: "你可能还没想到可以先试个简单的", parentFacingLabel: "策略工具断点" },
+      { id: "rigor_chain_gap", childFacingGuess: "你可能算的时候有一步没接上", parentFacingLabel: "严谨链条断点" },
+      { id: "verification_gap", childFacingGuess: "你可能还没习惯算完再检查一遍", parentFacingLabel: "校验反思断点" },
+    ],
+    developmentGoals: [{ id: "decimal-times-tenths-why", childFacingGoalPhrase: "说清楚结果为什么会变小" }],
   },
   createChallenge(input) {
     const band = input.difficultyBand === "lower" ? "lower" : "base";
@@ -99,7 +142,9 @@ export const mathPlugin: DisciplinePlugin = {
   },
   interpretEvent(challenge, event, history) {
     const p = event.payload;
-    if (p.type === "STROKE") return [{ evidenceId: `ev-${event.eventId}`, eventId: event.eventId, kind: "representation_attempt", summary: "画了表示", hypothesisSupport: [] }];
+    if (p.type === "STROKE") {
+      return [{ evidenceId: `ev-${event.eventId}`, eventId: event.eventId, kind: "representation_attempt", summary: "画了表示", hypothesisSupport: [], surfaceContextKey: challenge.surfaceContextKey, selfCorrection: false }];
+    }
     if (p.type === "UTTERANCE" || p.type === "ANSWER" || p.type === "EXPLAIN") return interpretText(challenge, event, p.text, history);
     return [];
   },
@@ -122,21 +167,22 @@ export const mathPlugin: DisciplinePlugin = {
     const p = productOf(transfer);
     return parseNumbers(text).some((n) => n !== p.a && n !== p.b && Math.abs(n - p.product) < 1e-9);
   },
+  classifyProbeOutcome,
   discriminatingProbes(challenge): DiscriminatingProbe[] {
     const p = productOf(challenge);
     return [
       { id: "magnitude-first", question: `算之前先说：结果会比 ${fmt(p.a)} 大还是小？`, outcomes: {
         smaller: [{ hypothesisId: "intuition_gap", direction: "weakens" }, { hypothesisId: "rigor_chain_gap", direction: "supports" }],
         larger: [{ hypothesisId: "intuition_gap", direction: "supports" }, { hypothesisId: "rigor_chain_gap", direction: "weakens" }],
-      } },
+      }, samples: { smaller: [`会比 ${fmt(p.a)} 小`], larger: [`应该比 ${fmt(p.a)} 大`] } },
       { id: "self-check", question: "你能自己检查一下这个结果吗？", outcomes: {
         selfCorrects: [{ hypothesisId: "verification_gap", direction: "weakens" }, { hypothesisId: "rigor_chain_gap", direction: "supports" }],
         noCheck: [{ hypothesisId: "verification_gap", direction: "supports" }, { hypothesisId: "rigor_chain_gap", direction: "weakens" }],
-      } },
+      }, samples: { selfCorrects: ["我检查了一下，应该是 0.72"], noCheck: ["不用检查了"] } },
       { id: "no-decimal-point", question: `${fmt(Math.round(p.a * 10))} × ${fmt(Math.round(p.b * 10))} 呢？`, outcomes: {
         correct: [{ hypothesisId: "representation_gap", direction: "supports" }, { hypothesisId: "rigor_chain_gap", direction: "weakens" }],
         wrong: [{ hypothesisId: "representation_gap", direction: "weakens" }, { hypothesisId: "rigor_chain_gap", direction: "supports" }],
-      } },
+      }, samples: { correct: [`是 ${fmt(Math.round(p.a * 10) * Math.round(p.b * 10))}`], wrong: ["不知道"] } },
     ];
   },
 };
