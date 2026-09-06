@@ -657,7 +657,7 @@ Mac mini 运行：
 
 这些接口属于实验性能力，当前不能等同于稳定公开产品契约。第一阶段必须先完成风险验证：
 
-1. 当前 Codex 订阅身份是否可持续建立实时会话；
+1. 当前 Codex 订阅身份是否可持续建立实时会话；**2026-09-06 实测：否。** codex-cli `0.153.4` 对 ChatGPT 登录身份拒绝 `thread/realtime/start`（`realtime conversation requires API key auth`），握手与 `listVoices` 可用但会话不可建立。第一版“订阅身份 + 不产生 API 计费”的前提在当前版本不成立，待用户裁决路线（见阶段 0 计划 Task 7）；
 2. 是否产生额外 API 计费或存在使用限制；
 3. 音频格式、延迟、打断和长会话稳定性；
 4. app-server 特性开关和升级后的协议漂移；
@@ -994,3 +994,4 @@ Mac mini 运行：
 - `0.2`：依据红线评审补充跨轮退出指标、提示预算、状态转换、写入权限、离散证据、差异诊断、幂等、实时预算、前置验证与儿童权利。
 - `0.3`：按用户确认将平板端改为完整原生 Swift App，采用 SwiftUI、PencilKit、AVAudioEngine 与 URLSessionWebSocketTask，取消 PWA 与原生壳回退路线。
 - `0.3.1`（2026-09-06）：11.3 补注 Codex `0.153.4` 的 schema 导出漂移，旧快照降为历史参考。
+- `0.3.2`（2026-09-06）：11.3 风险验证第 1 条记录实测结果——ChatGPT 身份不能建立 realtime 会话，Codex 门禁 BLOCKED，路线待裁决。

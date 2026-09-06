@@ -252,3 +252,11 @@ NSAppTransportSecurity:
 5. 所有未验证门禁继续明确标为未验证，没有被文字包装成“已打通”。
 
 完成首轮后，再继续 PencilKit、音频、局域网和 Codex 原始音频探针。
+
+## 14. 进展记录（2026-09-06，接手首日）
+
+- 仓库与分支 `feat/phase-0-native-ipad-gates` 已建立；Task 1–7 代码完成并提交，Task 6 材料就位。
+- 模拟器全量自动化通过：Swift 单测 33 个、UI 冒烟 4 条（画布 2、音频 1、网络 1，网络冒烟真连本机网关）；TS 测试 23 个、类型检查通过。
+- **Codex 门禁 `BLOCKED`**：`0.153.4` 在 ChatGPT 身份下拒绝 `thread/realtime/start`（`realtime conversation requires API key auth`）。按第 2 节第 4 条与第 9.3 节规则停在桥接层，未切换身份或模型。Task 8（PCM 中继）在路线裁决前不推进。
+- 真机门禁未开始：本机无代码签名身份、无配对设备、无描述文件；需要用户在 Xcode 登录 Apple ID 并连接 iPad 后再装机。
+- 网关运行主机为开发机 `houbin-mbp`（MacBook Pro），非 Mac mini；计划 §0 已注明。
