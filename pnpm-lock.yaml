@@ -42,6 +42,12 @@ importers:
         specifier: ^4.5.4
         version: 4.5.4
 
+  packages/session-contracts:
+    dependencies:
+      zod:
+        specifier: ^4.5.4
+        version: 4.5.4
+
   tools/codex-realtime-probe:
     dependencies:
       '@ai-scholar/gate-contracts':

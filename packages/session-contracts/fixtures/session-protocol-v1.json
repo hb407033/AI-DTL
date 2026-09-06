@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "events": [
+    { "eventId": "e-1", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 1, "occurredAt": 1757200000000, "quality": "confirmed", "source": "child_voice", "payload": { "type": "UTTERANCE", "text": "我觉得会比 2.4 小" } },
+    { "eventId": "e-2", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 2, "occurredAt": 1757200001000, "quality": "confirmed", "source": "child_touch", "payload": { "type": "STROKE", "strokeId": "st-1", "contentHash": "h1", "bounds": { "x": 10, "y": 10, "width": 100, "height": 40 } } },
+    { "eventId": "e-3", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 3, "occurredAt": 1757200002000, "quality": "confirmed", "source": "child_touch", "payload": { "type": "SELECT", "objectId": "bar-1" } },
+    { "eventId": "e-4", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 4, "occurredAt": 1757200003000, "quality": "confirmed", "source": "child_touch", "payload": { "type": "DRAG", "objectId": "label-1", "to": { "x": 50, "y": 60 } } },
+    { "eventId": "e-5", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 5, "occurredAt": 1757200004000, "quality": "confirmed", "source": "child_touch", "payload": { "type": "ERASE", "strokeId": "st-1", "contentHash": "h1" } },
+    { "eventId": "e-6", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 6, "occurredAt": 1757200005000, "quality": "confirmed", "source": "child_voice", "payload": { "type": "ANSWER", "text": "0.72" } },
+    { "eventId": "e-7", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 7, "occurredAt": 1757200006000, "quality": "corrected", "source": "child_voice", "payload": { "type": "EXPLAIN", "text": "0.3 是十分之三，所以结果比 2.4 小" } },
+    { "eventId": "e-8", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 8, "occurredAt": 1757200007000, "quality": "confirmed", "source": "child_button", "payload": { "type": "HELP_REQUEST" } },
+    { "eventId": "e-9", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 9, "occurredAt": 1757200008000, "quality": "confirmed", "source": "child_button", "payload": { "type": "PAUSE_REQUEST", "by": "child" } },
+    { "eventId": "e-10", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 10, "occurredAt": 1757200009000, "quality": "confirmed", "source": "child_button", "payload": { "type": "RESUME_REQUEST" } },
+    { "eventId": "e-11", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 11, "occurredAt": 1757200010000, "quality": "confirmed", "source": "child_button", "payload": { "type": "CONTEST", "targetId": "p-3" } },
+    { "eventId": "e-12", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 12, "occurredAt": 1757200011000, "quality": "confirmed", "source": "child_button", "payload": { "type": "DONE" } },
+    { "eventId": "e-13", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 13, "occurredAt": 1757200012000, "quality": "confirmed", "source": "child_button", "payload": { "type": "CONFIRM_TRANSCRIPT", "targetEventId": "e-1", "confirmed": true } },
+    { "eventId": "e-14", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 14, "occurredAt": 1757200013000, "quality": "confirmed", "source": "child_button", "payload": { "type": "SOFT_LANDING_CHOICE", "choice": "simpler" } },
+    { "eventId": "e-15", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 15, "occurredAt": 1757200014000, "quality": "confirmed", "source": "child_button", "payload": { "type": "MEMORY_ASSENT", "choice": "unsure" } }
+  ],
+  "proposals": [
+    { "proposalId": "p-1", "spokenResponse": "你现在已经确定了什么？", "learnerTask": "说说你确定的部分", "hintLevel": 1 },
+    { "proposalId": "p-2", "spokenResponse": "这是一个空的十等份长条。", "learnerTask": "在长条上标出 0.3", "hintLevel": 3, "expectedEvidence": ["tenths_meaning"], "canvasActions": [ { "kind": "upsertObject", "object": { "id": "bar-1", "owner": "agent", "kind": "tenthsBar", "props": { "filled": 0 } } } ] }
+  ],
+  "outbound": [
+    { "type": "speak", "id": "o-1", "text": "你现在已经确定了什么？", "hintLevel": 1, "interruptible": true },
+    { "type": "canvasAction", "id": "o-2", "action": { "kind": "highlight", "objectId": "bar-1" } },
+    { "type": "learnerTask", "id": "o-3", "text": "在长条上标出 0.3" },
+    { "type": "stateChanged", "id": "o-4", "state": "INDEPENDENT", "hintLevel": 0, "presence": "listening" },
+    { "type": "confirmTranscript", "id": "o-5", "targetEventId": "e-1", "text": "我觉得会比 2.4 小" },
+    { "type": "softLanding", "id": "o-6", "message": "这是在试，不是考试。", "options": ["simpler", "hint", "stop"] },
+    { "type": "notice", "id": "o-7", "text": "等我一下。" }
+  ],
+  "clientFrames": [
+    { "protocolVersion": 1, "type": "event", "id": "f-1", "clientSeq": 1, "sessionId": "s-1", "sentAt": 1757200000000, "event": { "eventId": "e-1", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 1, "occurredAt": 1757200000000, "quality": "confirmed", "source": "child_button", "payload": { "type": "DONE" } } }
+  ],
+  "serverFrames": [
+    { "protocolVersion": 1, "type": "ack", "id": "f-1", "clientSeq": 1, "serverReceivedAt": 1757200000050 },
+    { "protocolVersion": 1, "type": "nack", "reason": "seqGap", "expectedSeq": 2 },
+    { "protocolVersion": 1, "type": "outbound", "message": { "type": "notice", "id": "o-7", "text": "等我一下。" } },
+    { "protocolVersion": 1, "type": "error", "reason": "invalidJson" }
+  ]
+}
