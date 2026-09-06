@@ -260,3 +260,13 @@ NSAppTransportSecurity:
 - **Codex 门禁 `BLOCKED`**：`0.153.4` 在 ChatGPT 身份下拒绝 `thread/realtime/start`（`realtime conversation requires API key auth`）。按第 2 节第 4 条与第 9.3 节规则停在桥接层，未切换身份或模型。Task 8（PCM 中继）在路线裁决前不推进。
 - 真机门禁未开始：本机无代码签名身份、无配对设备、无描述文件；需要用户在 Xcode 登录 Apple ID 并连接 iPad 后再装机。
 - 网关运行主机为开发机 `houbin-mbp`（MacBook Pro），非 Mac mini；计划 §0 已注明。
+
+## 15. 进展记录（2026-09-06，阶段 1 开工）
+
+用户裁决：iPad 暂不升级、暂无 Apple Pencil，真机门禁与 Codex 路线挂起，先推进不依赖设备的功能。据此：
+
+- 设计稿升至 v0.4（第二轮评审 R0-1～R0-5、R1、R2 全部采纳，5.0 表补齐常驻控件通配行、软/硬预算、`assisted_round`）。
+- 新计划 `docs/superpowers/plans/2026-09-06-ai-scholar-phase-1-single-challenge-prototype.md` 已按 12 个任务全部实现：`packages/session-contracts`（儿童端协议）、`packages/learning-kernel`（状态机、预算、事件日志、校验器、桥接、存储、编排器）、`packages/plugin-math`（2.4 × 0.3 薄切片）、`apps/agent-host`（`:8788` 会话网关 + 家长控制台 + SQLite）。
+- 验证：`pnpm test` 168 个用例通过（含 15.3 八个脚本场景），`pnpm typecheck` 通过，`pnpm session:replay` 终态 `COMPLETED`，`pnpm host` 冒烟可达。
+- 仍未开始：iPad 儿童端会话界面（可先在模拟器做）、`CodexRealtimeBridge`（待路线裁决）、长期记忆写入与断线恢复（阶段 2）。
+

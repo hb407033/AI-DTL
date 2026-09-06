@@ -10,6 +10,12 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-30-ai-scholar-learning-system-design.md`（v0.4）。执行者必须同时读第 5、9.1.1、10、13、14.6、15.1–15.3 节。
 
+> **回写（2026-09-06）**：Task 1–12 全部 ✅ 已实现并提交（分支 `feat/phase-0-native-ipad-gates`）。全仓 168 个测试通过、类型检查通过、`pnpm session:replay` 终态 `COMPLETED` 退出码 0、`pnpm host` 冒烟 `/healthz` 与 `/parent` 可达。实现过程中对计划的修订已直接改回本文（代码块即现状）：
+> - ⚠️ Task 2：`INTERVENING` 收到非新策略产出（擦除、重画相同内容）不撤提示、不回 0 级；
+> - ⚠️ Task 3：新增 `nextHintRung()`——可见提示撤回后 `hintLevel` 归 0，但阶梯下一级按本挑战用过的最高级别算，避免重复发 1 级；硬预算判断先于最高级别判断；
+> - ⚠️ Task 10/11：编排器拆成 `acceptEvent`（同步落盘，接收网关的接收时间）与 `processAccepted`（异步教学），网关对事件帧**立即 ack**，教学输出经会话内串行处理链推送；桥接抛错时发“现在没法给你提示”通知而不伪装正常；
+> - ❌ 未做（按计划边界）：`CodexRealtimeBridge`、`GrowthLedgerService`、记忆路径、断线自动恢复、iPad 儿童端界面。
+
 ## Global Constraints
 
 - 阶段 1 范围（设计稿 14.6 第 2 条）：只实现 `2.4 × 0.3` 一条主路径、`ParentCoachBridge`/`ScriptedReplayBridge`、事件落盘；直接使用 5.0 完整状态表；暂不生成长期假设，不承诺断线自动恢复。**iPad 儿童端界面不在本计划内**（另立计划，等设备就绪）。
@@ -92,7 +98,7 @@ apps/
 **Interfaces:**
 - Produces: `EvidenceEvent`、`EventPayload`、`EventType`、`TeachingProposal`、`CanvasAction`、`SemanticObject`、`ChildOutbound`、`ClientFrame`、`ServerFrame`，以及同名 zod schema（`evidenceEventSchema`、`teachingProposalSchema`、`childOutboundSchema`、`clientFrameSchema`、`serverFrameSchema`）。
 
-- [ ] **Step 1：写失败的契约测试**
+- [x] **Step 1：写失败的契约测试**
 
 ```ts
 // packages/session-contracts/test/contracts.test.ts
@@ -135,12 +141,12 @@ describe("会话契约夹具", () => {
 });
 ```
 
-- [ ] **Step 2：跑测试确认失败**
+- [x] **Step 2：跑测试确认失败**
 
 Run: `pnpm --filter @ai-scholar/session-contracts test`
 Expected: 失败，`Cannot find package` / 找不到 `../src/index.js`。
 
-- [ ] **Step 3：写包清单与契约实现**
+- [x] **Step 3：写包清单与契约实现**
 
 ```json
 // packages/session-contracts/package.json
@@ -301,7 +307,7 @@ export * from "./teaching-proposal.js";
 export * from "./child-protocol.js";
 ```
 
-- [ ] **Step 4：写夹具**
+- [x] **Step 4：写夹具**
 
 ```json
 // packages/session-contracts/fixtures/session-protocol-v1.json
@@ -349,12 +355,12 @@ export * from "./child-protocol.js";
 }
 ```
 
-- [ ] **Step 5：安装并跑测试**
+- [x] **Step 5：安装并跑测试**
 
 Run: `pnpm install && pnpm --filter @ai-scholar/session-contracts test && pnpm --filter @ai-scholar/session-contracts typecheck`
 Expected: 4 个测试 PASS，typecheck 无错误。
 
-- [ ] **Step 6：提交**
+- [x] **Step 6：提交**
 
 ```bash
 git add packages/session-contracts pnpm-lock.yaml
@@ -376,7 +382,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Produces: `SessionState`、`ACTIVE_STATES`、`Signal`、`SessionContext`、`KernelAction`、`PolicyError`、`createSessionContext()`、`transition(ctx, signal): TransitionResult`。
 - 约定：进入 `WAITING_CONFIRMATION`、`PAUSED_TECH`、`PAUSED_CHILD` 时把当前状态存进 `priorState`；回到“原活动状态”即回到 `priorState`。
 
-- [ ] **Step 1：写失败的转换表测试**
+- [x] **Step 1：写失败的转换表测试**
 
 ```ts
 // packages/learning-kernel/test/session-state.test.ts
@@ -530,12 +536,12 @@ describe("未列出的转换默认拒绝并记录策略错误", () => {
 });
 ```
 
-- [ ] **Step 2：跑测试确认失败**
+- [x] **Step 2：跑测试确认失败**
 
 Run: `pnpm --filter @ai-scholar/learning-kernel test`
 Expected: 失败，找不到 `../src/session-state.js`。
 
-- [ ] **Step 3：写包清单与状态机实现**
+- [x] **Step 3：写包清单与状态机实现**
 
 ```json
 // packages/learning-kernel/package.json
@@ -753,12 +759,12 @@ function reject(ctx: SessionContext, error: PolicyError): TransitionResult {
 export * from "./session-state.js";
 ```
 
-- [ ] **Step 4：安装并跑测试**
+- [x] **Step 4：安装并跑测试**
 
 Run: `pnpm install && pnpm --filter @ai-scholar/learning-kernel test && pnpm --filter @ai-scholar/learning-kernel typecheck`
 Expected: 全部 PASS（31 行合法转换 + 元规则 + 拒绝用例）。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add packages/learning-kernel pnpm-lock.yaml
@@ -778,7 +784,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Consumes: `SessionContext`（Task 2）。
 - Produces: `InterventionBudget`、`KERNEL_BUDGET_CEILING`、`clampBudget(requested)`、`evaluateEscalation(ctx, requestedLevel, budget, options?)`、`EscalationVerdict`。
 
-- [ ] **Step 1：写失败测试**
+- [x] **Step 1：写失败测试**
 
 ```ts
 // packages/learning-kernel/test/hint-budget.test.ts
@@ -842,12 +848,12 @@ describe("升级裁定（设计稿 5.4）", () => {
 });
 ```
 
-- [ ] **Step 2：跑测试确认失败**
+- [x] **Step 2：跑测试确认失败**
 
 Run: `pnpm --filter @ai-scholar/learning-kernel test -- hint-budget`
 Expected: 失败，找不到 `../src/hint-budget.js`。
 
-- [ ] **Step 3：实现**
+- [x] **Step 3：实现**
 
 ```ts
 // packages/learning-kernel/src/hint-budget.ts
@@ -898,12 +904,12 @@ export function evaluateEscalation(ctx: BudgetContext, requestedLevel: number, b
 }
 ```
 
-- [ ] **Step 4：跑测试**
+- [x] **Step 4：跑测试**
 
 Run: `pnpm --filter @ai-scholar/learning-kernel test && pnpm --filter @ai-scholar/learning-kernel typecheck`
 Expected: PASS。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add packages/learning-kernel
@@ -923,7 +929,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Consumes: `EvidenceEvent`（Task 1）。
 - Produces: `StoredEvent`、`AppendResult`、`contentHashOf(event)`、`canonicalJson(value)`、`class EventLog { append(event, receivedAt); lastConfirmedSeq; all(); byId(eventId) }`。
 
-- [ ] **Step 1：写失败测试**
+- [x] **Step 1：写失败测试**
 
 ```ts
 // packages/learning-kernel/test/event-log.test.ts
@@ -983,12 +989,12 @@ describe("幂等事件日志（设计稿 10.2）", () => {
 });
 ```
 
-- [ ] **Step 2：跑测试确认失败**
+- [x] **Step 2：跑测试确认失败**
 
 Run: `pnpm --filter @ai-scholar/learning-kernel test -- event-log`
 Expected: 失败，找不到模块。
 
-- [ ] **Step 3：实现**
+- [x] **Step 3：实现**
 
 ```ts
 // packages/learning-kernel/src/event-log.ts
@@ -1063,12 +1069,12 @@ export class EventLog {
 }
 ```
 
-- [ ] **Step 4：跑测试与类型检查**
+- [x] **Step 4：跑测试与类型检查**
 
 Run: `pnpm --filter @ai-scholar/learning-kernel test && pnpm --filter @ai-scholar/learning-kernel typecheck`
 Expected: PASS。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add packages/learning-kernel
@@ -1091,7 +1097,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Consumes: `EvidenceEvent`、`CanvasAction`（Task 1）、`InterventionBudget`（Task 3）。
 - Produces: `LearningChallenge`、`HintContent`、`ChallengeInput`、`DisciplineEvidence`、`HypothesisSupport`、`DiscriminatingProbe`、`ExplainBackVerdict`、`DisciplinePlugin`、`DisciplinePluginManifest`、`PluginRegistry`、`runPluginContract(plugin): ContractCheck[]`。
 
-- [ ] **Step 1：写失败测试**
+- [x] **Step 1：写失败测试**
 
 ```ts
 // packages/learning-kernel/test/plugin-registry.test.ts
@@ -1191,12 +1197,12 @@ describe("内核纯净度", () => {
 });
 ```
 
-- [ ] **Step 2：跑测试确认失败**
+- [x] **Step 2：跑测试确认失败**
 
 Run: `pnpm --filter @ai-scholar/learning-kernel test -- plugin-registry`
 Expected: 失败，找不到 `../src/plugin.js`。
 
-- [ ] **Step 3：实现挑战与插件契约**
+- [x] **Step 3：实现挑战与插件契约**
 
 ```ts
 // packages/learning-kernel/src/challenge.ts
@@ -1368,12 +1374,12 @@ export * from "./plugin.js";
 export * from "./testing/plugin-contract.js";
 ```
 
-- [ ] **Step 4：跑测试与类型检查**
+- [x] **Step 4：跑测试与类型检查**
 
 Run: `pnpm --filter @ai-scholar/learning-kernel test && pnpm --filter @ai-scholar/learning-kernel typecheck`
 Expected: PASS，含纯净度检查。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add packages/learning-kernel
@@ -1393,7 +1399,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Consumes: `TeachingProposal`（Task 1）、`SessionContext`（Task 2）、`evaluateEscalation`/`InterventionBudget`（Task 3）、`DisciplinePlugin`（Task 5）。
 - Produces: `validateProposal(input: ValidationInput): ValidationResult`，`ValidationInput = { proposal, context, budget, plugin, protectedObjectIds, maxSpokenChars? }`，`ValidationResult = { accepted: true; liftsSoftBudget: boolean } | { accepted: false; reasons: string[] }`。
 
-- [ ] **Step 1：写失败测试**
+- [x] **Step 1：写失败测试**
 
 ```ts
 // packages/learning-kernel/test/proposal-validator.test.ts
@@ -1449,12 +1455,12 @@ describe("教学提案本地校验（设计稿 10.3、13）", () => {
 });
 ```
 
-- [ ] **Step 2：跑测试确认失败**
+- [x] **Step 2：跑测试确认失败**
 
 Run: `pnpm --filter @ai-scholar/learning-kernel test -- proposal-validator`
 Expected: 失败，找不到模块。
 
-- [ ] **Step 3：实现**
+- [x] **Step 3：实现**
 
 ```ts
 // packages/learning-kernel/src/proposal-validator.ts
@@ -1513,12 +1519,12 @@ export function validateProposal(input: ValidationInput): ValidationResult {
 }
 ```
 
-- [ ] **Step 4：跑测试与类型检查**
+- [x] **Step 4：跑测试与类型检查**
 
 Run: `pnpm --filter @ai-scholar/learning-kernel test && pnpm --filter @ai-scholar/learning-kernel typecheck`
 Expected: PASS。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add packages/learning-kernel
@@ -1540,7 +1546,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Consumes: `DisciplinePlugin`、`LearningChallenge`、`DisciplineEvidence`、`runPluginContract`（Task 5）。
 - Produces: `mathPlugin: DisciplinePlugin`（`manifest.id === "math"`）、`MATH_HYPOTHESES`、`parseNumbers(text)`。挑战 `2.4 × 0.3`（答案 0.72），迁移 `3.5 × 0.4`（答案 1.4），低难度带 `2 × 0.3`（答案 0.6）。
 
-- [ ] **Step 1：写失败测试**
+- [x] **Step 1：写失败测试**
 
 ```ts
 // packages/plugin-math/test/plugin-math.test.ts
@@ -1616,12 +1622,12 @@ describe("讲回与迁移", () => {
 });
 ```
 
-- [ ] **Step 2：跑测试确认失败**
+- [x] **Step 2：跑测试确认失败**
 
 Run: `pnpm --filter @ai-scholar/plugin-math test`
 Expected: 失败，包不存在。
 
-- [ ] **Step 3：实现**
+- [x] **Step 3：实现**
 
 ```json
 // packages/plugin-math/package.json
@@ -1791,12 +1797,12 @@ export const mathPlugin: DisciplinePlugin = {
 export { MATH_HYPOTHESES, mathPlugin, parseNumbers } from "./decimal-multiplication.js";
 ```
 
-- [ ] **Step 4：安装并跑测试**
+- [x] **Step 4：安装并跑测试**
 
 Run: `pnpm install && pnpm --filter @ai-scholar/plugin-math test && pnpm --filter @ai-scholar/plugin-math typecheck`
 Expected: PASS。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add packages/plugin-math pnpm-lock.yaml
@@ -1818,7 +1824,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Consumes: `TeachingProposal`（Task 1）、`LearningChallenge`、`DisciplineEvidence`（Task 5）、`SessionState`（Task 2）。
 - Produces: `TurnPurpose`、`TurnContext`、`RealtimeBridge`、`ScriptedReplayBridge`、`ReplayScript`、`ParentCoachBridge`、`ParentInput`。
 
-- [ ] **Step 1：写失败测试**
+- [x] **Step 1：写失败测试**
 
 ```ts
 // packages/learning-kernel/test/bridges.test.ts
@@ -1871,12 +1877,12 @@ describe("ParentCoachBridge", () => {
 });
 ```
 
-- [ ] **Step 2：跑测试确认失败**
+- [x] **Step 2：跑测试确认失败**
 
 Run: `pnpm --filter @ai-scholar/learning-kernel test -- bridges`
 Expected: 失败，找不到模块。
 
-- [ ] **Step 3：实现**
+- [x] **Step 3：实现**
 
 ```ts
 // packages/learning-kernel/src/bridge.ts
@@ -1998,12 +2004,12 @@ export * from "./bridges/scripted-replay-bridge.js";
 export * from "./bridges/parent-coach-bridge.js";
 ```
 
-- [ ] **Step 4：跑测试与类型检查**
+- [x] **Step 4：跑测试与类型检查**
 
 Run: `pnpm --filter @ai-scholar/learning-kernel test && pnpm --filter @ai-scholar/learning-kernel typecheck`
 Expected: PASS。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add packages/learning-kernel
@@ -2024,7 +2030,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Consumes: `StoredEvent`（Task 4）、`SessionContext`（Task 2）、`LearningChallenge`（Task 5）、`ChildOutbound`、`TeachingProposal`（Task 1）。
 - Produces: `SessionStore` 接口、`SessionSnapshot`、`ProposalRecord`、`InMemorySessionStore`、`SqliteSessionStore`（`node:sqlite`）、`shouldSnapshot(input)`。
 
-- [ ] **Step 1：写失败测试（同一套用例跑两种实现）**
+- [x] **Step 1：写失败测试（同一套用例跑两种实现）**
 
 ```ts
 // packages/learning-kernel/test/store.test.ts
@@ -2093,12 +2099,12 @@ describe("快照策略（设计稿 12）", () => {
 });
 ```
 
-- [ ] **Step 2：跑测试确认失败**
+- [x] **Step 2：跑测试确认失败**
 
 Run: `pnpm --filter @ai-scholar/learning-kernel test -- store`
 Expected: 失败，找不到模块。
 
-- [ ] **Step 3：实现**
+- [x] **Step 3：实现**
 
 ```ts
 // packages/learning-kernel/src/store.ts
@@ -2264,12 +2270,12 @@ export * from "./store.js";
 export * from "./sqlite-store.js";
 ```
 
-- [ ] **Step 4：跑测试与类型检查**
+- [x] **Step 4：跑测试与类型检查**
 
 Run: `pnpm --filter @ai-scholar/learning-kernel test && pnpm --filter @ai-scholar/learning-kernel typecheck`
 Expected: PASS。Node 22 会打印 `ExperimentalWarning: SQLite`，不是错误。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add packages/learning-kernel
@@ -2305,7 +2311,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 13. `tick(now)`：`INDEPENDENT` 下距最近新策略 ≥ 初始窗口 → `windowExpired`；距窗口开始 ≥ 硬上限 → `hardCapReached`；`WAITING_CONFIRMATION` 超 60 秒 → `confirmationTimeout`。
 14. 每次状态变化、100 条事件或 30 秒落一次快照。
 
-- [ ] **Step 1：写失败测试（覆盖设计稿 15.3 的八个脚本场景）**
+- [x] **Step 1：写失败测试（覆盖设计稿 15.3 的八个脚本场景）**
 
 ```ts
 // packages/learning-kernel/test/orchestrator.test.ts
@@ -2574,12 +2580,12 @@ describe("幂等与序号", () => {
 });
 ```
 
-- [ ] **Step 2：跑测试确认失败**
+- [x] **Step 2：跑测试确认失败**
 
 Run: `pnpm --filter @ai-scholar/learning-kernel test -- orchestrator`
 Expected: 失败，找不到模块。
 
-- [ ] **Step 3：实现编排器**
+- [x] **Step 3：实现编排器**
 
 ```ts
 // packages/learning-kernel/src/orchestrator.ts
@@ -2654,8 +2660,8 @@ export class SessionOrchestrator {
   }
 
   /** 第一步：同步进日志与存储。重放/缺口/冲突在这里就能回答，不等教学逻辑 */
-  acceptEvent(event: EvidenceEvent): AppendResult {
-    const append = this.log.append(event, this.deps.clock());
+  acceptEvent(event: EvidenceEvent, receivedAt: number = this.deps.clock()): AppendResult {
+    const append = this.log.append(event, receivedAt);
     if (append.kind === "appended") {
       this.deps.store.appendEvent(this.deps.sessionId, append.stored);
       this.eventsSinceSnapshot += 1;
@@ -2924,12 +2930,12 @@ export class SessionOrchestrator {
 }
 ```
 
-- [ ] **Step 4：跑测试与类型检查，逐个修到全绿**
+- [x] **Step 4：跑测试与类型检查，逐个修到全绿**
 
 Run: `pnpm --filter @ai-scholar/learning-kernel test && pnpm --filter @ai-scholar/learning-kernel typecheck`
 Expected: PASS。若某场景期望的出站消息顺序与实现不一致，以设计稿规则为准修实现，不改测试期望里的状态断言。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add packages/learning-kernel
@@ -2956,7 +2962,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Produces: `SessionHost`（`createSessionHost(options)`：管理会话 → 编排器映射；`open(sessionId)` 返回初始帧；`handleFrame(sessionId, raw, now)` **只返回 ack/nack/error**，教学输出经 `subscribe(sessionId, listener)` 异步推送；`idle(sessionId)` 等待该会话处理链空闲；`parentBridge(sessionId)`、`parentView`、`submitParentProposal`、`tick`、`sessionIds`）、`buildHostServer(options)`（Fastify 实例，`/healthz`、`GET /session`(ws)、`GET /parent`、`GET /parent/sessions`、`GET /parent/sessions/:id`、`POST /parent/sessions/:id/proposal`、`POST /parent/sessions/:id/tick`）。
 - 事件在会话内串行处理（一条处理链），保证教学逻辑按 clientSeq 顺序执行。
 
-- [ ] **Step 1：写失败测试**
+- [x] **Step 1：写失败测试**
 
 ```ts
 // apps/agent-host/test/session-gateway.test.ts
@@ -3028,6 +3034,15 @@ import { buildHostServer } from "../src/server.js";
 let baseUrl = "";
 let app: Awaited<ReturnType<typeof buildHostServer>>;
 
+// 轮询等待条件成立，最多 2 秒；比固定 sleep 稳定
+async function until(cond: () => boolean, timeoutMs = 2_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!cond()) {
+    if (Date.now() > deadline) throw new Error("等待超时");
+    await new Promise((r) => setTimeout(r, 10));
+  }
+}
+
 beforeAll(async () => {
   app = await buildHostServer({ bridge: "parent", dataDir: null });
   await app.listen({ host: "127.0.0.1", port: 0 });
@@ -3046,15 +3061,14 @@ describe("宿主 HTTP/WS", () => {
   test("WebSocket 打开会话收到 outbound，发事件收到 ack，家长 API 能看到状态并提交提案", async () => {
     const ws = new WebSocket(`ws://${baseUrl}/session?sessionId=s-ws`);
     const received: Array<{ type: string; message?: { type: string } }> = [];
-    await new Promise<void>((resolve) => ws.on("open", () => resolve()));
     ws.on("message", (raw) => received.push(JSON.parse(raw.toString())));
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise<void>((resolve) => ws.on("open", () => resolve()));
+    await until(() => received.length >= 2);
     expect(received.map((f) => f.type)).toEqual(["outbound", "outbound"]);
 
     ws.send(JSON.stringify({ protocolVersion: 1, type: "event", id: "f-1", clientSeq: 1, sessionId: "s-ws", sentAt: 1,
       event: { eventId: "f-1", clientSessionId: "s-ws", deviceId: "d", clientSeq: 1, occurredAt: 1, quality: "confirmed", source: "child_button", semanticObjectIds: [], payload: { type: "HELP_REQUEST" } } }));
-    await new Promise((r) => setTimeout(r, 50));
-    expect(received.some((f) => f.type === "ack")).toBe(true);
+    await until(() => received.some((f) => f.type === "ack"));
 
     const view = await (await fetch(`http://${baseUrl}/parent/sessions/s-ws`)).json() as { state: string; pending: { purpose: string } | null };
     expect(view.state).toBe("INTERVENING");
@@ -3062,19 +3076,18 @@ describe("宿主 HTTP/WS", () => {
 
     const res = await fetch(`http://${baseUrl}/parent/sessions/s-ws/proposal`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ spokenResponse: "你确定了什么？", learnerTask: "说说", hintLevel: 1 }) });
     expect(res.status).toBe(200);
-    await new Promise((r) => setTimeout(r, 50));
-    expect(received.some((f) => f.type === "outbound" && f.message?.type === "speak")).toBe(true);
+    await until(() => received.some((f) => f.type === "outbound" && f.message?.type === "speak"));
     ws.close();
   });
 });
 ```
 
-- [ ] **Step 2：跑测试确认失败**
+- [x] **Step 2：跑测试确认失败**
 
 Run: `pnpm --filter @ai-scholar/agent-host test`
 Expected: 失败，包不存在。
 
-- [ ] **Step 3：实现**
+- [x] **Step 3：实现**
 
 ```json
 // apps/agent-host/package.json
@@ -3181,7 +3194,7 @@ export function createSessionHost(options: SessionHostOptions) {
       if (!parsed.success) return [{ protocolVersion: v, type: "error", reason: "invalidFrame" }];
       const frame = parsed.data;
       const { orchestrator } = live(sessionId);
-      const append = orchestrator.acceptEvent(frame.event);
+      const append = orchestrator.acceptEvent(frame.event, now);
       if (append.kind === "seqGap") return [{ protocolVersion: v, type: "nack", reason: "seqGap", expectedSeq: append.expectedSeq }];
       if (append.kind === "conflict") return [{ protocolVersion: v, type: "nack", reason: "payloadConflict", expectedSeq: frame.clientSeq }];
       if (append.kind === "duplicate") {
@@ -3402,17 +3415,17 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop()
 
 `pnpm-workspace.yaml` 的 `packages` 增加一行 `- apps/agent-host`；根 `package.json` scripts 增加 `"host": "pnpm --filter @ai-scholar/agent-host start"` 与 `"session:replay": "pnpm --filter @ai-scholar/agent-host replay"`。
 
-- [ ] **Step 4：安装并跑测试**
+- [x] **Step 4：安装并跑测试**
 
 Run: `pnpm install && pnpm --filter @ai-scholar/agent-host test && pnpm --filter @ai-scholar/agent-host typecheck`
 Expected: PASS。`ws` 只是测试客户端依赖（Node 22 的全局 `WebSocket` 也可，但 `ws` 事件 API 更稳定）。
 
-- [ ] **Step 5：手动冒烟**
+- [x] **Step 5：手动冒烟**
 
 Run: `pnpm host`（另一个终端）`curl -s http://localhost:8788/healthz` 与浏览器打开 `http://localhost:8788/parent`。
 Expected: `{"status":"ok","bridge":"parent"}`；页面显示“家长控制台”。
 
-- [ ] **Step 6：提交**
+- [x] **Step 6：提交**
 
 ```bash
 git add apps/agent-host pnpm-workspace.yaml package.json pnpm-lock.yaml
@@ -3435,7 +3448,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: `runReplay({ script, childEvents, clock? }): Promise<ReplayTrace>`，`ReplayTrace = { finalState, hintLevels: number[], maxHintLevelUsed, independentSuccess, assistedRound, outbound: ChildOutbound[], policyErrors }`；命令行 `pnpm session:replay -- --script <path> --events <path>`，终态 `COMPLETED` 退出码 0，否则 2。
 
-- [ ] **Step 1：写夹具与失败测试**
+- [x] **Step 1：写夹具与失败测试**
 
 ```json
 // apps/agent-host/fixtures/scripted-happy-path.json
@@ -3490,12 +3503,12 @@ describe("脚本回放", () => {
 });
 ```
 
-- [ ] **Step 2：跑测试确认失败**
+- [x] **Step 2：跑测试确认失败**
 
 Run: `pnpm --filter @ai-scholar/agent-host test -- replay`
 Expected: 失败，找不到模块。
 
-- [ ] **Step 3：实现回放**
+- [x] **Step 3：实现回放**
 
 ```ts
 // apps/agent-host/src/replay-cli.ts
@@ -3556,18 +3569,18 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop()
 }
 ```
 
-- [ ] **Step 4：跑全仓测试、类型检查与命令行**
+- [x] **Step 4：跑全仓测试、类型检查与命令行**
 
 Run: `pnpm test && pnpm typecheck && pnpm session:replay; echo "exit=$?"`
 Expected: 全部 PASS；命令行最后一行 `finalState: "COMPLETED"`，`exit=0`。
 
-- [ ] **Step 5：方案回写**
+- [x] **Step 5：方案回写**
 
 - 本计划每个 Task 逐步勾选；实现与计划不一致处在该 Task 末尾加「实现偏离」一行。
 - 设计稿 14.6 第 2 条后追加：`2026-09-06 实现状态：Mac 侧内核、数学插件、两种桥接、SQLite 落盘与家长控制台已实现（见阶段 1 计划）；iPad 儿童端界面待设备就绪另立计划。` 版本记录加 `0.4.1`。
 - 交接文档 §14 追加阶段 1 进展与下一步（iPad 儿童端会话界面计划、Codex 路线裁决仍待用户）。
 
-- [ ] **Step 6：提交**
+- [x] **Step 6：提交**
 
 ```bash
 git add apps/agent-host docs
