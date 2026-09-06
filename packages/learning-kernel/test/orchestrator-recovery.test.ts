@@ -105,3 +105,14 @@ describe("当前画面快照", () => {
     expect(h.orch.viewSnapshot().find((m) => m.type === "learnerTask")).toMatchObject({ text: "换一个情境：请回答 43 减 1。" });
   });
 });
+
+describe("旧快照兼容", () => {
+  test("快照没有 runtime 时，当前画面仍按状态给出任务文字", async () => {
+    const h = harness([]);
+    await h.orch.start();
+    const snapshot = h.store.latestSnapshot("s-1")!;
+    h.store.saveSnapshot("s-1", { ...snapshot, snapshotSeq: snapshot.snapshotSeq + 1, runtime: undefined });
+    const restored = SessionOrchestrator.restore(h.deps)!;
+    expect(restored.viewSnapshot().find((m) => m.type === "learnerTask")).toMatchObject({ text: h.orch.challenge.learnerPrompt });
+  });
+});

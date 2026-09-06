@@ -116,10 +116,17 @@ export class SessionOrchestrator {
     let n = 0;
     const id = () => `snap-${++n}`;
     out.push({ type: "stateChanged", id: id(), state: this.context.state, hintLevel: this.context.hintLevel, presence: presenceFor(this.context.state) });
-    if (this.lastLearnerTask) out.push({ type: "learnerTask", id: id(), text: this.lastLearnerTask });
+    out.push({ type: "learnerTask", id: id(), text: this.lastLearnerTask || this.taskForCurrentState() });
     for (const object of this.agentObjects) out.push({ type: "canvasAction", id: id(), action: { kind: "upsertObject", object } });
     if (this.lastSpoken !== null) out.push({ type: "speak", id: id(), text: this.lastSpoken, hintLevel: this.context.hintLevel, interruptible: true });
     return out;
+  }
+
+  /** 没有记录过任务文字（例如旧快照）时按状态推导：迁移用迁移题，讲回用讲回问句，其余用当前挑战 */
+  private taskForCurrentState(): string {
+    if (this.context.state === "TRANSFER" && this.transferChallenge) return this.transferChallenge.learnerPrompt;
+    if (this.context.state === "EXPLAIN_BACK") return this.challenge.explainBackSpec.prompt;
+    return this.challenge.learnerPrompt;
   }
 
   /** 重建时把快照之后的事件只当证据吸收：不改状态、不请求桥接 */
