@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "runId": "wizard-<YYYY-MM-DD>-<n>",
+  "date": "YYYY-MM-DD",
+  "challenge": "2.4 × 0.3",
+  "transferChallenge": "3.5 × 0.4",
+  "initialUnderstanding": "",
+  "secondsToFirstProductiveAction": null,
+  "maxHintLevel": null,
+  "hintThatRestoredProductivity": "",
+  "explainBackEvidence": "",
+  "transferSucceededWithoutHint": null,
+  "childUsedPause": false,
+  "childUsedContest": false,
+  "childWillingToContinue": null,
+  "evidenceThatDiscriminatedRootCauses": "",
+  "notes": ""
+}
