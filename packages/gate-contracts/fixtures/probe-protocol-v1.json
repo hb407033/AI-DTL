@@ -1,0 +1,20 @@
+{
+  "protocolVersion": 1,
+  "clientToServer": {
+    "ping": { "protocolVersion": 1, "type": "ping", "id": "c-0001", "clientSeq": 1, "sessionId": "sess-a", "sentAt": 1757100000000 },
+    "requestSemanticAction": { "protocolVersion": 1, "type": "requestSemanticAction", "id": "c-0002", "clientSeq": 2, "sessionId": "sess-a", "sentAt": 1757100000100 }
+  },
+  "serverToClient": {
+    "ack": { "protocolVersion": 1, "type": "ack", "id": "c-0001", "clientSeq": 1, "serverReceivedAt": 1757100000042 },
+    "nack": { "protocolVersion": 1, "type": "nack", "reason": "seqGap", "expectedSeq": 2 },
+    "semanticAction": {
+      "protocolVersion": 1, "type": "semanticAction", "id": "s-0001", "inReplyTo": "c-0002",
+      "action": { "kind": "upsertCircle", "circle": { "id": "circle-1", "owner": "agent", "center": { "x": 160, "y": 200 }, "radius": 60 } }
+    },
+    "error": { "protocolVersion": 1, "type": "error", "reason": "unknownType", "id": "c-0009" }
+  },
+  "rejected": {
+    "unknownType": { "protocolVersion": 1, "type": "teleport", "id": "c-0009", "clientSeq": 9, "sessionId": "sess-a", "sentAt": 1757100000900 },
+    "wrongVersion": { "protocolVersion": 2, "type": "ping", "id": "c-0010", "clientSeq": 10, "sessionId": "sess-a", "sentAt": 1757100001000 }
+  }
+}

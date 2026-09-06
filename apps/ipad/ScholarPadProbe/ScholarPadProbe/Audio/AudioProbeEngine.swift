@@ -53,10 +53,10 @@ final class AudioProbeEngine {
             status = "已校准阈值 \(String(format: "%.4f", value))，等待开口…"
         case .interrupted(let latency, let detectToStop):
             trialRunning = false
-            store.appendInterruptSample(MetricSample(metric: .localInterrupt, elapsedMs: latency, success: true))
+            store.append(MetricSample(metric: .localInterrupt, elapsedMs: latency, success: true))
             lastResult = String(format: "开口→停播 %.1f ms（判定→停播 %.2f ms）", latency, detectToStop)
             status = "已打断"
-            Self.logger.notice("local_interrupt_ms sample=\(latency, format: .fixed(precision: 1)) detect_to_stop=\(detectToStop, format: .fixed(precision: 2)) n=\(self.store.interruptSamples.count)")
+            Self.logger.notice("local_interrupt_ms sample=\(latency, format: .fixed(precision: 1)) detect_to_stop=\(detectToStop, format: .fixed(precision: 2)) n=\(self.store.samples(for: .localInterrupt).count)")
         case .trialTimedOut:
             trialRunning = false
             status = "30 秒内没有检测到开口，本次不计样本"

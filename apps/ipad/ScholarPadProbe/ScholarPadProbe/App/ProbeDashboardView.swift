@@ -5,14 +5,18 @@ import UIKit
 struct ProbeDashboardView: View {
     @State private var store: ProbeMetricsStore
     @State private var audio: AudioProbeEngine
-    @State private var scene = SemanticScene()
+    @State private var canvas: CanvasSceneStore
+    @State private var socket: ProbeWebSocket
     @State private var clearToken = 0
     @State private var demoCircleCount = 0
 
     init() {
         let store = ProbeMetricsStore()
+        let canvas = CanvasSceneStore()
         _store = State(initialValue: store)
+        _canvas = State(initialValue: canvas)
         _audio = State(initialValue: AudioProbeEngine(store: store))
+        _socket = State(initialValue: ProbeWebSocket(store: store, canvas: canvas))
     }
 
     var body: some View {
@@ -21,6 +25,8 @@ struct ProbeDashboardView: View {
                 .tabItem { Label("画布", systemImage: "pencil.and.outline") }
             AudioProbeView(engine: audio, store: store)
                 .tabItem { Label("音频", systemImage: "waveform") }
+            NetworkProbeView(socket: socket, store: store)
+                .tabItem { Label("网络", systemImage: "network") }
         }
     }
 
@@ -31,7 +37,7 @@ struct ProbeDashboardView: View {
                 Divider()
                 ZStack {
                     PencilLatencyCanvasView(store: store, clearToken: clearToken)
-                    SemanticOverlayView(scene: scene)
+                    SemanticOverlayView(scene: canvas.scene)
                 }
             }
             .navigationTitle("ScholarPad Probe")
@@ -39,61 +45,30 @@ struct ProbeDashboardView: View {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     // 两个清空是两个动作：语义层与笔迹层永远分开
                     Button("加一个语义圆") { addDemoCircle() }
-                    Button("清空语义层") { scene.clear() }
+                    Button("清空语义层") { canvas.scene.clear() }
                     Button("清空笔迹", role: .destructive) { clearToken += 1 }
-                    Button("清空本次探针", role: .destructive) { store.clearPenSamples() }
+                    Button("清空本次探针", role: .destructive) { store.clear(.penRender) }
                 }
             }
         }
     }
 
     private var statsBar: some View {
-        HStack(spacing: 24) {
-            stat("样本", "\(store.penSamples.count)", identifier: "penSampleCount")
-            stat("P50", ms(store.penSummary?.p50Ms))
-            stat("P95", ms(store.penSummary?.p95Ms))
-            stat("最大", ms(store.penSummary?.maxMs))
-            verdictLabel
+        HStack {
+            MetricStatsRow(metric: .penRender, store: store, countIdentifier: "penSampleCount")
             Spacer()
             Text("\(UIDevice.current.model) · iPadOS \(UIDevice.current.systemVersion)")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .font(.system(.body, design: .monospaced))
-    }
-
-    private var verdictLabel: some View {
-        Group {
-            switch store.penVerdict {
-            case .insufficient(let have, let need):
-                Label("样本不足 \(have)/\(need)", systemImage: "hourglass").foregroundStyle(.secondary)
-            case .pass(let p95):
-                Label("门禁通过 P95 \(ms(p95))", systemImage: "checkmark.seal.fill").foregroundStyle(.green)
-            case .fail(let p95):
-                Label("门禁未过 P95 \(ms(p95))", systemImage: "xmark.octagon.fill").foregroundStyle(.red)
-            }
-        }
-        .font(.body.bold())
-    }
-
-    private func stat(_ title: String, _ value: String, identifier: String? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(value).accessibilityIdentifier(identifier ?? "")
-        }
-    }
-
-    private func ms(_ value: Double?) -> String {
-        guard let value else { return "—" }
-        return String(format: "%.1f ms", value)
     }
 
     /// 阶段 0 用来肉眼验证分层的假远端动作；Task 5 接入局域网后由 Mac 端下发。
     private func addDemoCircle() {
         demoCircleCount += 1
         let offset = CGFloat(demoCircleCount * 90)
-        scene.upsert(SemanticCircle(id: "demo-\(demoCircleCount)", owner: .agent,
+        canvas.scene.upsert(SemanticCircle(id: "demo-\(demoCircleCount)", owner: .agent,
                                     center: CGPoint(x: 160 + offset, y: 200), radius: 60))
     }
 }

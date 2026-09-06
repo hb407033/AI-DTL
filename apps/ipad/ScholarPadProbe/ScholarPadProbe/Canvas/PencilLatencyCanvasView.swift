@@ -77,7 +77,7 @@ struct PencilLatencyCanvasView: UIViewRepresentable {
 
         @objc private func onFrame(_ link: CADisplayLink) {
             if let sample = tracker.noteFrame(targetTimestamp: link.targetTimestamp) {
-                store.appendPenSample(sample)
+                store.append(sample)
             }
         }
 

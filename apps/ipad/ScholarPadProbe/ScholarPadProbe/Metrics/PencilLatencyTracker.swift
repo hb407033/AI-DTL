@@ -25,16 +25,32 @@ struct PencilLatencyTracker {
     }
 }
 
-/// 一条门禁规则：样本下限 + P95 上限。
+/// 一条门禁规则：样本下限 + P95 上限，个别指标另有 P50 上限。
 struct GateRule: Equatable {
     let p95LimitMs: Double
     let minSamples: Int
+    var p50LimitMs: Double? = nil
 }
 
 /// 门禁规则表，与计划 §0 表格一致；Mac 端报告器必须用同一组数。
 enum GateThresholds {
     static let penRender = GateRule(p95LimitMs: 50, minSamples: 100)
     static let localInterrupt = GateRule(p95LimitMs: 200, minSamples: 20)
+    static let lanAck = GateRule(p95LimitMs: 150, minSamples: 100)
+    static let firstAudio = GateRule(p95LimitMs: 3000, minSamples: 20, p50LimitMs: 1500)
+    static let remoteCanvas = GateRule(p95LimitMs: 300, minSamples: 20)
+    static let reconnect = GateRule(p95LimitMs: 5000, minSamples: 5)
+
+    static func rule(for metric: MetricName) -> GateRule {
+        switch metric {
+        case .penRender: penRender
+        case .localInterrupt: localInterrupt
+        case .lanAck: lanAck
+        case .firstAudio: firstAudio
+        case .remoteCanvas: remoteCanvas
+        case .reconnect: reconnect
+        }
+    }
 }
 
 enum GateVerdict: Equatable {
@@ -49,6 +65,8 @@ enum LatencyGate {
             return .insufficient(have: samples.count, need: rule.minSamples)
         }
         let summary = try MetricRecorder.summarize(samples)
-        return summary.p95Ms <= rule.p95LimitMs ? .pass(p95Ms: summary.p95Ms) : .fail(p95Ms: summary.p95Ms)
+        let p95Ok = summary.p95Ms <= rule.p95LimitMs
+        let p50Ok = rule.p50LimitMs.map { summary.p50Ms <= $0 } ?? true
+        return p95Ok && p50Ok ? .pass(p95Ms: summary.p95Ms) : .fail(p95Ms: summary.p95Ms)
     }
 }
