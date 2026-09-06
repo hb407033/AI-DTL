@@ -1,0 +1,14 @@
+{
+  "name": "@ai-scholar/codex-realtime-probe",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/live-probe.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-scholar/gate-contracts": "workspace:*",
+    "zod": "^4.5.4"
+  }
+}

@@ -42,6 +42,15 @@ importers:
         specifier: ^4.5.4
         version: 4.5.4
 
+  tools/codex-realtime-probe:
+    dependencies:
+      '@ai-scholar/gate-contracts':
+        specifier: workspace:*
+        version: link:../../packages/gate-contracts
+      zod:
+        specifier: ^4.5.4
+        version: 4.5.4
+
 packages:
 
   '@esbuild/aix-ppc64@0.28.2':
