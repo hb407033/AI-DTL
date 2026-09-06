@@ -14,6 +14,11 @@ import { createSessionHost } from "./session-gateway.js";
 
 const PORT = 8788;
 
+/** IPv4、IPv6 与 IPv4-mapped IPv6 三种回环写法 */
+function isLoopback(ip: string): boolean {
+  return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1" || ip.startsWith("127.");
+}
+
 export interface HostServerOptions {
   bridge: "parent" | "scripted";
   script?: ReplayScript | undefined;
@@ -47,6 +52,15 @@ export async function buildHostServer(options: HostServerOptions) {
   const consoleHtml = readFileSync(new URL("./parent-console.html", import.meta.url), "utf8");
 
   app.get("/healthz", async () => ({ status: "ok", bridge: options.bridge }));
+
+  // 家长视图只在学习主机本机可达：iPad 与 Mac 同在家庭局域网，孩子端不得看到能力分析与技术状态（设计稿 8.1、11.2）。
+  // 儿童端通道 /healthz 与 /session 不受影响，仍对局域网开放。
+  app.addHook("onRequest", async (request, reply) => {
+    if (!request.url.startsWith("/parent")) return;
+    if (isLoopback(request.ip)) return;
+    request.log.warn({ ip: request.ip, url: request.url }, "拒绝来自局域网其他设备的家长端请求");
+    return reply.code(403).send({ error: "家长视图只能在学习主机本机打开" });
+  });
 
   app.get("/session", { websocket: true }, async (socket, request) => {
     const sessionId = (request.query as { sessionId?: string }).sessionId ?? `session-${Date.now()}`;

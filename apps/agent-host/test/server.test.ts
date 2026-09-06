@@ -52,3 +52,27 @@ describe("宿主 HTTP/WS", () => {
     ws.close();
   });
 });
+
+describe("家长端只在本机可达（设计稿 8.1、11.2）", () => {
+  test("来自局域网其他设备的 /parent 请求被拒，孩子的 iPad 看不到能力分析", async () => {
+    for (const url of ["/parent", "/parent/sessions", "/parent/sessions/s-ws"]) {
+      const res = await app.inject({ method: "GET", url, remoteAddress: "192.168.97.42" });
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toMatchObject({ error: "家长视图只能在学习主机本机打开" });
+    }
+    const post = await app.inject({ method: "POST", url: "/parent/sessions/s-ws/proposal", remoteAddress: "192.168.97.42", payload: { spokenResponse: "", learnerTask: "t", hintLevel: 1 } });
+    expect(post.statusCode).toBe(403);
+  });
+
+  test("儿童端通道不受影响：/healthz 与 /session 仍对局域网开放", async () => {
+    const res = await app.inject({ method: "GET", url: "/healthz", remoteAddress: "192.168.97.42" });
+    expect(res.statusCode).toBe(200);
+  });
+
+  test("本机访问照常", async () => {
+    for (const addr of ["127.0.0.1", "::1", "::ffff:127.0.0.1"]) {
+      const res = await app.inject({ method: "GET", url: "/parent/sessions", remoteAddress: addr });
+      expect(res.statusCode).toBe(200);
+    }
+  });
+});
