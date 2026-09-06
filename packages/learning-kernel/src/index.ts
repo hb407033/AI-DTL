@@ -6,3 +6,6 @@ export * from "./challenge.js";
 export * from "./plugin.js";
 export * from "./testing/plugin-contract.js";
 export * from "./proposal-validator.js";
+export * from "./bridge.js";
+export * from "./bridges/scripted-replay-bridge.js";
+export * from "./bridges/parent-coach-bridge.js";

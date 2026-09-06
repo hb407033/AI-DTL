@@ -1929,7 +1929,7 @@ export class ScriptedReplayBridge implements RealtimeBridge {
 
   constructor(private readonly script: ReplayScript) {}
 
-  async start(): Promise<void> { this.cursor = 0; }
+  async start(_sessionId: string): Promise<void> { this.cursor = 0; }
 
   async requestProposal(turn: TurnContext): Promise<TeachingProposal> {
     this.requests.push(turn);
@@ -1963,7 +1963,7 @@ export class ParentCoachBridge implements RealtimeBridge {
   private waiting: { turn: TurnContext; resolve: (p: TeachingProposal) => void } | null = null;
   private counter = 0;
 
-  async start(): Promise<void> {}
+  async start(_sessionId: string): Promise<void> {}
 
   requestProposal(turn: TurnContext): Promise<TeachingProposal> {
     if (this.waiting) throw new Error("上一轮家长输入尚未完成");
