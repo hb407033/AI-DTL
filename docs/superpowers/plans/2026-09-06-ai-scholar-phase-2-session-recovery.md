@@ -10,6 +10,8 @@
 
 **Spec:** 设计稿 v0.4.2 第 5.0、12、13、14.5 节；阶段 1 两份计划。
 
+> **回写（2026-09-06）**：Task 1–3 全部 ✅。内核恢复测试 6 个、网关续接测试 2 个、儿童端单测 18 个、UI 冒烟 1 条通过；Mac 侧全仓 176 个测试通过。⚠️ 偏离：内存存储的 `saveSnapshot` 改为 `structuredClone`，与 SQLite 一样“落盘即脱离引用”（否则快照会跟着活对象一起变，恢复时证据重复）；`viewSnapshot()` 用 `snap-N` 作消息 id，保证重建前后画面可逐字比较；儿童端 UI 冒烟以 `--fresh-session` 启动，避免续接上次会话。❌ 未做：检查点不一致分支（作品版本漂移，阶段 3）。
+
 ## Global Constraints
 
 - 恢复只能回到 5.0 表已有状态，不新增状态；`PAUSED_TECH` 出口两条都实现，但阶段 2 只在“快照之前事件已落盘”这一前提下判定检查点一致（不一致分支留给作品版本漂移场景，阶段 3）。
@@ -31,22 +33,22 @@ apps/ipad/ScholarPad/ScholarPadTests/SessionViewStateTests.swift  # resetForResu
 
 ## Task 1：内核恢复
 
-- [ ] Step 1：`orchestrator-recovery.test.ts`：
+- [x] Step 1：`orchestrator-recovery.test.ts`：
   - 跑到“求助 → 1 级提示（带一个 Agent 对象）”，`restoreOrchestrator(deps)` 得到新实例：`context`、`challenge`、`evidence`、`viewSnapshot()` 里的 Agent 对象与最近一句话都与原实例一致；重放旧事件 id 得 `duplicate`；新事件 `clientSeq` 接着原序号。
   - 快照后再来两条事件（不改状态）再重启：证据条数含这两条，序号连续。
   - `techInterrupted()` → `PAUSED_TECH`，`tick(+10 min)` 什么也不发；`techRecovered()` → 回 `INTERVENING`，窗口从恢复时刻重新计（再 `tick(+29 s)` 不触发评估）。
   - `viewSnapshot()` 顺序：`stateChanged` → `learnerTask`（TRANSFER 用迁移题、EXPLAIN_BACK 用讲回问句、其余用当前挑战）→ 每个 Agent 对象一条 `upsertObject` → 最近一句 `speak`（若有）。
-- [ ] Step 2：实现：`SessionSnapshot.runtime?: OrchestratorRuntime`（`erasedHashes: string[]; agentObjects: SemanticObject[]; childObjectIds: string[]; lastProposalId: string | null; lastLearnerTask: string; lastSpoken: string | null; windowStartedAt; lastNewStrategyAt`）；`SessionOrchestrator` 用 `agentObjects` 替代 `agentObjectIds`，记录 `lastLearnerTask/lastSpoken`；`static restore(deps): SessionOrchestrator | null`；`techInterrupted()`、`techRecovered()`、`viewSnapshot()`。
-- [ ] Step 3：全部内核测试通过；提交「实现会话快照恢复与技术中断暂停」。
+- [x] Step 2：实现：`SessionSnapshot.runtime?: OrchestratorRuntime`（`erasedHashes: string[]; agentObjects: SemanticObject[]; childObjectIds: string[]; lastProposalId: string | null; lastLearnerTask: string; lastSpoken: string | null; windowStartedAt; lastNewStrategyAt`）；`SessionOrchestrator` 用 `agentObjects` 替代 `agentObjectIds`，记录 `lastLearnerTask/lastSpoken`；`static restore(deps): SessionOrchestrator | null`；`techInterrupted()`、`techRecovered()`、`viewSnapshot()`。
+- [x] Step 3：全部内核测试通过；提交「实现会话快照恢复与技术中断暂停」。
 
 ## Task 2：宿主续接
 
-- [ ] Step 1：网关测试：同一 store 建两个 host，第一个跑到 1 级提示后丢弃；第二个 `open("s-1")` 返回的帧含 `stateChanged INTERVENING`、任务、Agent 对象、最近一句；再发旧帧得原 ack；`onSocketClosed("s-1")` 后 `parentView.state === "PAUSED_TECH"`，再次 `open` 回 `INTERVENING`。
-- [ ] Step 2：实现：`open` 三分支；`onSocketClosed(sessionId)`；`server.ts` 的 close 回调调用它。
-- [ ] Step 3：测试通过；提交「宿主支持断线暂停与重启续接」。
+- [x] Step 1：网关测试：同一 store 建两个 host，第一个跑到 1 级提示后丢弃；第二个 `open("s-1")` 返回的帧含 `stateChanged INTERVENING`、任务、Agent 对象、最近一句；再发旧帧得原 ack；`onSocketClosed("s-1")` 后 `parentView.state === "PAUSED_TECH"`，再次 `open` 回 `INTERVENING`。
+- [x] Step 2：实现：`open` 三分支；`onSocketClosed(sessionId)`；`server.ts` 的 close 回调调用它。
+- [x] Step 3：测试通过；提交「宿主支持断线暂停与重启续接」。
 
 ## Task 3：儿童端续接
 
-- [ ] Step 1：`SessionViewStateTests` 增 `resetForResume()`：清 Agent 层、高亮、指针、弹层，保留任务与最近一句。
-- [ ] Step 2：`SessionClient`：sessionId 存 `UserDefaults`（键 `padSessionId`），重连 `handleOpen` 前先 `view.resetForResume()`；`ChildSessionView` 加一个不起眼的“换一题”入口（新 sessionId）。
-- [ ] Step 3：单测与 UI 冒烟通过（宿主脚本模式）；回写三份文档；提交「儿童端续接同一会话」。
+- [x] Step 1：`SessionViewStateTests` 增 `resetForResume()`：清 Agent 层、高亮、指针、弹层，保留任务与最近一句。
+- [x] Step 2：`SessionClient`：sessionId 存 `UserDefaults`（键 `padSessionId`），重连 `handleOpen` 前先 `view.resetForResume()`；`ChildSessionView` 加一个不起眼的“换一题”入口（新 sessionId）。
+- [x] Step 3：单测与 UI 冒烟通过（宿主脚本模式）；回写三份文档；提交「儿童端续接同一会话」。

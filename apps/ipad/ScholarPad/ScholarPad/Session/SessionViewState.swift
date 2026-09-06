@@ -20,6 +20,15 @@ struct SessionViewState: Equatable {
     var softLanding: SoftLanding?
     var notice: String?
 
+    /// 重连或重开 App 前调用：Agent 层与弹层由宿主随后下发的“当前画面”重建，任务与最近一句先留着免得闪空
+    mutating func resetForResume() {
+        agentObjects = []
+        highlightedIds = []
+        pointer = nil
+        softLanding = nil
+        pendingConfirmation = nil
+    }
+
     var isPaused: Bool { phase == "PAUSED_CHILD" || phase == "PAUSED_TECH" }
     var isCompleted: Bool { phase == "COMPLETED" }
 

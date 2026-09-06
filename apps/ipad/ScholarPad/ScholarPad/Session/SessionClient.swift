@@ -1,6 +1,6 @@
 // 儿童端 → 宿主的 WebSocket 客户端（家庭局域网明文 ws://，设计稿 11.4）。
 // 职责：连接与退避重连；把孩子的事件入队后发送；ack 移除、nack 从期望序号重放；把出站消息喂给 SessionViewState.reduce。
-// 阶段 1 每次启动新建 sessionId，不做检查点恢复（阶段 2）。
+// sessionId 存在本机：重开 App 续接同一会话，宿主会重发当前画面；启动参数 --fresh-session 或调用 startNewSession() 才换新会话。
 import Foundation
 import Observation
 import UIKit
@@ -19,7 +19,7 @@ final class SessionClient {
     private(set) var isConnected = false
     private(set) var connectionText = "未连接"
     private(set) var rejectedFrames = 0
-    let sessionId: String
+    private(set) var sessionId: String
 
     private var outbox: EventOutbox
     private let events = SocketEvents()
@@ -28,14 +28,18 @@ final class SessionClient {
     private var wantConnected = false
     private var reconnectAttempt = 0
 
-    init(sessionId: String = "pad-\(UUID().uuidString.prefix(8))") {
+    init(sessionId: String? = nil) {
         #if targetEnvironment(simulator)
         host = "localhost"   // 模拟器与 Mac 同机
         #else
         host = UserDefaults.standard.string(forKey: "padHost") ?? "houbin-mbp.local"
         #endif
-        self.sessionId = sessionId
-        outbox = EventOutbox(sessionId: sessionId, deviceId: UIDevice.current.identifierForVendor?.uuidString ?? "ipad")
+        let fresh = ProcessInfo.processInfo.arguments.contains("--fresh-session")
+        let saved = fresh ? nil : UserDefaults.standard.string(forKey: "padSessionId")
+        let resolved = sessionId ?? saved ?? Self.newSessionId()
+        UserDefaults.standard.set(resolved, forKey: "padSessionId")
+        self.sessionId = resolved
+        outbox = EventOutbox(sessionId: resolved, deviceId: UIDevice.current.identifierForVendor?.uuidString ?? "ipad")
         session = URLSession(configuration: .default, delegate: events, delegateQueue: nil)
         events.onOpen = { [weak self] taskId in Task { @MainActor in self?.handleOpen(taskId: taskId) } }
         events.onClose = { [weak self] taskId, reason in Task { @MainActor in self?.handleClose(taskId: taskId, reason: reason) } }
@@ -90,6 +94,7 @@ final class SessionClient {
         isConnected = true
         reconnectAttempt = 0
         connectionText = "已连接 \(host)"
+        view.resetForResume()   // 宿主紧接着会下发当前画面
         let replay = outbox.pending   // 断线期间没被确认的按序号重发；宿主按 id 去重
         Task { for frame in replay { try? await self.transmit(frame) } }
     }
@@ -111,6 +116,18 @@ final class SessionClient {
             self.open()
         }
     }
+
+    /// 换一题：断开、换新 sessionId、清空画面、重连。旧会话留在宿主里，不删。
+    func startNewSession() {
+        disconnect()
+        sessionId = Self.newSessionId()
+        UserDefaults.standard.set(sessionId, forKey: "padSessionId")
+        outbox = EventOutbox(sessionId: sessionId, deviceId: outbox.deviceId)
+        view = SessionViewState()
+        connect()
+    }
+
+    private static func newSessionId() -> String { "pad-\(UUID().uuidString.prefix(8))" }
 
     // MARK: - 收发
 

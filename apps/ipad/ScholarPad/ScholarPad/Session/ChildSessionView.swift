@@ -74,6 +74,8 @@ struct ChildSessionView: View {
             Spacer()
             Button("清空笔迹", role: .destructive) { clearToken += 1 }
                 .font(.caption)
+            Button("换一题") { clearToken += 1; client.startNewSession() }
+                .font(.caption)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)

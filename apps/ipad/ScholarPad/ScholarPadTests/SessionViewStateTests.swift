@@ -65,3 +65,24 @@ final class SessionViewStateTests: XCTestCase {
         XCTAssertEqual(state.notice, "等我一下。")
     }
 }
+
+final class SessionViewStateResumeTests: XCTestCase {
+    func testResetForResumeClearsAgentLayerAndOverlaysButKeepsTaskAndLine() {
+        var state = SessionViewState()
+        SessionViewState.reduce(&state, .learnerTask(id: "o1", text: "题"))
+        SessionViewState.reduce(&state, .speak(id: "o2", text: "话", hintLevel: 1, interruptible: true))
+        SessionViewState.reduce(&state, .canvasAction(id: "o3", action: .upsertObject(SemanticObject(id: "bar", owner: "agent", kind: "tenthsBar"))))
+        SessionViewState.reduce(&state, .canvasAction(id: "o4", action: .highlight(objectId: "bar")))
+        SessionViewState.reduce(&state, .softLanding(id: "o5", message: "m", options: ["stop"]))
+        SessionViewState.reduce(&state, .confirmTranscript(id: "o6", targetEventId: "e", text: "t"))
+        state.resetForResume()
+        XCTAssertEqual(state.agentObjects, [])
+        XCTAssertEqual(state.highlightedIds, [])
+        XCTAssertNil(state.pointer)
+        XCTAssertNil(state.softLanding)
+        XCTAssertNil(state.pendingConfirmation)
+        XCTAssertEqual(state.taskText, "题")
+        XCTAssertEqual(state.agentLine, "话")
+        XCTAssertEqual(state.speakVersion, 1)   // 续接时宿主会重发最近一句，届时再 +1 触发朗读
+    }
+}

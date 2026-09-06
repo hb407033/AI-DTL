@@ -1,6 +1,6 @@
 # AI 学科心智学习系统设计规范
 
-- 版本：0.4.2（第二轮评审修订稿 + 阶段 1 实现状态回写）
+- 版本：0.4.3（第二轮评审修订稿 + 阶段 1/2 实现状态回写）
 - 状态：已确认总体架构与原生 iPad 技术路线
 - 日期：2026-08-30
 - 首个使用者：小学五年级孩子
@@ -824,7 +824,7 @@ Mac mini 运行：
 
 1. **前置门禁**：家长白板扮演 Agent 跑完数学闭环；目标平板完成录音、播放、画线和家庭局域网 HTTP/WS 验证；Codex 完成实时订阅与延迟验证。
 2. **单挑战机器原型**：只实现 `2.4 × 0.3` 一条主路径、`ParentCoachBridge`/`ScriptedReplayBridge`、本地画布和事件落盘；直接使用第 5.0 节完整状态表（同名状态、同一张表，部分转换暂不可达），不自造简化状态机；暂不生成长期假设，不承诺断线自动恢复。
-   2026-09-06 实现状态：Mac 侧通用内核（5.0 完整状态表、提示预算、幂等事件日志、提案校验器、`RealtimeBridge` 接口）、数学插件薄切片、`ScriptedReplayBridge`/`ParentCoachBridge`、SQLite 落盘与家长控制台已实现，15.3 的八个脚本场景有确定性测试（见 `docs/superpowers/plans/2026-09-06-ai-scholar-phase-1-single-challenge-prototype.md`）；iPad 儿童端单屏会话界面（`apps/ipad/ScholarPad`：PencilKit 笔迹层、Agent 语义层、文字代替语音的说话入口、四个常驻按钮）已在模拟器跑通并有 UI 冒烟（见 `docs/superpowers/plans/2026-09-06-ai-scholar-phase-1-ipad-child-session-ui.md`），真机与 Pencil 待设备；`CodexRealtimeBridge` 仍受阶段 0 门禁 BLOCKED 约束。
+   2026-09-06 实现状态：Mac 侧通用内核（5.0 完整状态表、提示预算、幂等事件日志、提案校验器、`RealtimeBridge` 接口）、数学插件薄切片、`ScriptedReplayBridge`/`ParentCoachBridge`、SQLite 落盘与家长控制台已实现，15.3 的八个脚本场景有确定性测试（见 `docs/superpowers/plans/2026-09-06-ai-scholar-phase-1-single-challenge-prototype.md`）；iPad 儿童端单屏会话界面（`apps/ipad/ScholarPad`：PencilKit 笔迹层、Agent 语义层、文字代替语音的说话入口、四个常驻按钮）已在模拟器跑通并有 UI 冒烟（见 `docs/superpowers/plans/2026-09-06-ai-scholar-phase-1-ipad-child-session-ui.md`），真机与 Pencil 待设备；断线暂停（`PAUSED_TECH`）、宿主重启从快照重建、儿童端重开续接同一会话已实现（`docs/superpowers/plans/2026-09-06-ai-scholar-phase-2-session-recovery.md`），阶段 2 原“不承诺断线自动恢复”的边界已提前满足；`CodexRealtimeBridge` 仍受阶段 0 门禁 BLOCKED 约束。
 3. **数学 Alpha**：接入 Codex、完整状态机、提示预算、区分性根因探针、无提示迁移和分级成长写入。
 4. **双插件 MVP**：加入文学薄插件、家长视图、完整断线恢复、删除语义和跨轮退出趋势。
 
@@ -1030,3 +1030,4 @@ Mac mini 运行：
 - `0.4`（2026-09-06）：采纳第二轮评审 R0-1～R0-5、R1-1/1-2/1-4/1-5/1-6、R2-1～R2-6，补全 5.0 状态表、提示预算、`assisted_round`、审计字段与阶段 2 状态机边界；裁决见第 19 节。
 - `0.4.1`（2026-09-06）：14.6 第 2 条记录阶段 1 Mac 侧内核实现状态。
 - `0.4.2`（2026-09-06）：14.6 第 2 条补记 iPad 儿童端会话界面在模拟器上跑通。
+- `0.4.3`（2026-09-06）：14.6 第 2 条补记断线暂停、重启重建与儿童端续接已实现。

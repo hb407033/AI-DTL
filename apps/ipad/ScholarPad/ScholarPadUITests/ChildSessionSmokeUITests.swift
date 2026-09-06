@@ -7,6 +7,7 @@ final class ChildSessionSmokeUITests: XCTestCase {
     @MainActor
     func testHelpRequestBringsFirstHintFromHost() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["--fresh-session"]   // 不续接上次的会话，每次冒烟都从新题开始
         app.launch()
 
         let task = app.staticTexts["taskText"]
