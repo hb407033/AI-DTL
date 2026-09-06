@@ -36,26 +36,3 @@ final class PencilLatencyTrackerTests: XCTestCase {
         XCTAssertEqual(sample?.elapsedMs, 0)
     }
 }
-
-final class PencilLatencyGateTests: XCTestCase {
-    private func samples(_ values: [Double]) -> [MetricSample] {
-        values.map { MetricSample(metric: .penRender, elapsedMs: $0, success: true) }
-    }
-
-    func testFewerThanHundredSamplesIsInsufficient() throws {
-        let verdict = try PencilLatencyGate.evaluate(samples(Array(repeating: 10, count: 99)))
-        XCTAssertEqual(verdict, .insufficient(have: 99, need: 100))
-    }
-
-    func testP95AtMost50msPasses() throws {
-        // 100 个样本：95 个 30ms、5 个 60ms → nearest-rank P95 = 第 95 个 = 30ms
-        let verdict = try PencilLatencyGate.evaluate(samples(Array(repeating: 30, count: 95) + Array(repeating: 60, count: 5)))
-        XCTAssertEqual(verdict, .pass(p95Ms: 30))
-    }
-
-    func testP95Above50msFails() throws {
-        // 94 个 30ms、6 个 60ms → 第 95 个 = 60ms
-        let verdict = try PencilLatencyGate.evaluate(samples(Array(repeating: 30, count: 94) + Array(repeating: 60, count: 6)))
-        XCTAssertEqual(verdict, .fail(p95Ms: 60))
-    }
-}

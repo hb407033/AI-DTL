@@ -3,12 +3,28 @@ import SwiftUI
 import UIKit
 
 struct ProbeDashboardView: View {
-    @State private var store = ProbeMetricsStore()
+    @State private var store: ProbeMetricsStore
+    @State private var audio: AudioProbeEngine
     @State private var scene = SemanticScene()
     @State private var clearToken = 0
     @State private var demoCircleCount = 0
 
+    init() {
+        let store = ProbeMetricsStore()
+        _store = State(initialValue: store)
+        _audio = State(initialValue: AudioProbeEngine(store: store))
+    }
+
     var body: some View {
+        TabView {
+            canvasTab
+                .tabItem { Label("画布", systemImage: "pencil.and.outline") }
+            AudioProbeView(engine: audio, store: store)
+                .tabItem { Label("音频", systemImage: "waveform") }
+        }
+    }
+
+    private var canvasTab: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 statsBar
