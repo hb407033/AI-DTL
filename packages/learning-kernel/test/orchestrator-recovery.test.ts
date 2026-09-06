@@ -3,6 +3,7 @@ import type { ChildOutbound, EvidenceEvent, TeachingProposal } from "@ai-scholar
 import { ScriptedReplayBridge, type ReplayScript } from "../src/bridges/scripted-replay-bridge.js";
 import { SessionOrchestrator, type OrchestratorDeps } from "../src/orchestrator.js";
 import { InMemorySessionStore } from "../src/store.js";
+import { resolveConfirmedEvents } from "../src/transcript-confirmation.js";
 import { fakePlugin } from "./helpers/fake-plugin.js";
 
 // 会话状态 = 可重放事件 + 明确快照（设计稿 13「服务重启」）：重启后从最新快照重建，快照之后的事件只灌回日志与证据
@@ -114,5 +115,30 @@ describe("旧快照兼容", () => {
     h.store.saveSnapshot("s-1", { ...snapshot, snapshotSeq: snapshot.snapshotSeq + 1, runtime: undefined });
     const restored = SessionOrchestrator.restore(h.deps)!;
     expect(restored.viewSnapshot().find((m) => m.type === "learnerTask")).toMatchObject({ text: h.orch.challenge.learnerPrompt });
+  });
+});
+
+describe("重启后的出站消息编号与转写确认", () => {
+  test("出站消息编号接着原来往下走，不与重启前的编号撞号", async () => {
+    const h = harness([]);
+    const started = await h.orch.start();
+    const lastId = started[started.length - 1]!.id;
+    const restored = SessionOrchestrator.restore(h.deps)!;
+    const next = await restored.handleEvent(h.ev({ type: "PAUSE_REQUEST", by: "child" }, 1));
+    expect(next.outbound[0]!.id).not.toBe(lastId);
+    expect(Number(next.outbound[0]!.id.replace("o-", ""))).toBeGreaterThan(Number(lastId.replace("o-", "")));
+  });
+
+  test("孩子确认过的转写在事件日志里也算数，后来的读者不会当它没确认", async () => {
+    // 确认结果是一条独立事件，原事件不可变；任何后来的读者（成长账本）都要靠推导拿到有效质量
+    const h = harness([]);
+    await h.orch.start();
+    const unconfirmed = { ...h.ev({ type: "UTTERANCE", text: "四十一" }, 1), quality: "unconfirmed" as const };
+    await h.orch.handleEvent(unconfirmed);
+    await h.orch.handleEvent(h.ev({ type: "CONFIRM_TRANSCRIPT", targetEventId: unconfirmed.eventId, confirmed: true, correctedText: "42" }, 2));
+    const stored = h.store.listEvents("s-1").map((e) => e.event);
+    expect(stored[0]?.quality).toBe("unconfirmed");   // 原事件保持不变
+    const resolved = resolveConfirmedEvents(stored);
+    expect(resolved[0]).toMatchObject({ quality: "corrected", payload: { type: "UTTERANCE", text: "42" } });
   });
 });

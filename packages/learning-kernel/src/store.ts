@@ -26,6 +26,8 @@ export interface OrchestratorRuntime {
   lastSpoken: string | null;
   windowStartedAt: number;
   lastNewStrategyAt: number;
+  /** 出站消息编号；重启后续号，否则会与重启前发出的 id 撞号 */
+  outboundCounter?: number | undefined;
 }
 
 export interface SessionSnapshot {

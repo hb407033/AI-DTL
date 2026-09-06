@@ -10,6 +10,7 @@ import type { DisciplinePlugin } from "./plugin.js";
 import { validateProposal } from "./proposal-validator.js";
 import { createSessionContext, transition, type SessionContext, type Signal } from "./session-state.js";
 import { shouldSnapshot, type OrchestratorRuntime, type SessionStore } from "./store.js";
+import { resolveConfirmedEvents } from "./transcript-confirmation.js";
 
 export interface OrchestratorDeps {
   sessionId: string;
@@ -80,12 +81,15 @@ export class SessionOrchestrator {
       orch.lastSpoken = snapshot.runtime.lastSpoken;
       orch.windowStartedAt = snapshot.runtime.windowStartedAt;
       orch.lastNewStrategyAt = snapshot.runtime.lastNewStrategyAt;
+      orch.outboundCounter = snapshot.runtime.outboundCounter ?? 0;   // 续号，避免重启后与历史出站 id 撞号
     }
     const events = deps.store.listEvents(deps.sessionId);
     orch.log = new EventLog(events);
-    for (const stored of events) {
+    // 按推导后的有效质量吸收：孩子确认过的转写不能因为重启就被当成没确认
+    const resolved = resolveConfirmedEvents(events.map((e) => e.event));
+    for (const [index, stored] of events.entries()) {
       if (stored.event.clientSeq > snapshot.lastConfirmedSeq) {
-        orch.absorb(stored.event);
+        orch.absorb(resolved[index] ?? stored.event);
         orch.eventsSinceSnapshot += 1;
       }
     }
@@ -423,7 +427,7 @@ export class SessionOrchestrator {
     return {
       erasedHashes: [...this.erasedHashes], agentObjects: [...this.agentObjects], childObjectIds: [...this.childObjectIds],
       lastProposalId: this.lastProposalId, lastLearnerTask: this.lastLearnerTask, lastSpoken: this.lastSpoken,
-      windowStartedAt: this.windowStartedAt, lastNewStrategyAt: this.lastNewStrategyAt,
+      windowStartedAt: this.windowStartedAt, lastNewStrategyAt: this.lastNewStrategyAt, outboundCounter: this.outboundCounter,
     };
   }
 
