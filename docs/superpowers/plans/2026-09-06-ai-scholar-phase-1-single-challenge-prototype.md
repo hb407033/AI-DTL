@@ -1311,7 +1311,7 @@ export type { ChallengeInput, DisciplineEvidence, DiscriminatingProbe, ExplainBa
 
 ```ts
 // packages/learning-kernel/src/testing/plugin-contract.ts
-// 插件契约检查（设计稿 15.2）：每个插件的测试都调用它并断言全部通过，数学与文学插件共用同一套检查。
+// 插件契约检查（设计稿 15.2）：每个插件的测试都调用它并断言全部通过，所有学科插件共用同一套检查。
 // 返回结构化结果而不是直接断言，避免内核源码依赖测试框架。
 import { teachingProposalSchema } from "@ai-scholar/session-contracts";
 import { KERNEL_BUDGET_CEILING } from "../hint-budget.js";
@@ -1401,10 +1401,10 @@ import { describe, expect, test } from "vitest";
 import type { TeachingProposal } from "@ai-scholar/session-contracts";
 import { KERNEL_BUDGET_CEILING } from "../src/hint-budget.js";
 import { validateProposal } from "../src/proposal-validator.js";
-import { createSessionContext } from "../src/session-state.js";
+import { createSessionContext, type SessionContext } from "../src/session-state.js";
 import { fakePlugin } from "./helpers/fake-plugin.js";
 
-const ctx = () => ({ ...createSessionContext(), state: "INTERVENING" as const, substantiveAttempts: 1 });
+const ctx = (): SessionContext => ({ ...createSessionContext(), state: "INTERVENING", substantiveAttempts: 1 });
 const proposal = (patch: Partial<TeachingProposal> = {}): TeachingProposal => ({
   proposalId: "p-1", spokenResponse: "你现在已经确定了什么？", canvasActions: [], learnerTask: "说说看", expectedEvidence: [], hintLevel: 1, ...patch,
 });
