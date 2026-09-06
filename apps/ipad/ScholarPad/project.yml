@@ -1,0 +1,53 @@
+# 正式儿童端 App 的 XcodeGen 工程定义。.xcodeproj 不入库，改此文件后运行 `xcodegen generate` 重建。
+# 与阶段 0 探针 App（../ScholarPadProbe）分开：探针只做门禁测量，这里才是孩子面对的界面。
+name: ScholarPad
+options:
+  bundleIdPrefix: com.houbin.aischolar
+  deploymentTarget:
+    iOS: "18.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    TARGETED_DEVICE_FAMILY: "2"
+    CODE_SIGN_STYLE: Automatic
+targets:
+  ScholarPad:
+    type: application
+    platform: iOS
+    sources:
+      - ScholarPad
+    info:
+      path: ScholarPad/Info.plist
+      properties:
+        UILaunchScreen: {}
+        NSMicrophoneUsageDescription: "用于孩子与学习 Agent 进行实时语音互动。"
+        NSLocalNetworkUsageDescription: "用于连接家中的 Mac mini 学习主机。"
+        # 只放开局域网明文连接（家庭局域网 HTTP/WS 决策，设计稿 11.4），不设置全局 NSAllowsArbitraryLoads
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.houbin.aischolar.pad
+  ScholarPadUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - ScholarPadUITests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: ScholarPad
+  ScholarPadTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - ScholarPadTests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: ScholarPad
