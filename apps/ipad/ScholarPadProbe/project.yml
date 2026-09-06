@@ -30,6 +30,16 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.houbin.aischolar.probe
+  ScholarPadProbeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - ScholarPadProbeUITests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: ScholarPadProbe
   ScholarPadProbeTests:
     type: bundle.unit-test
     platform: iOS
