@@ -21,6 +21,34 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0(@types/node@26.4.1)(vite@8.2.2(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13))
 
+  apps/agent-host:
+    dependencies:
+      '@ai-scholar/learning-kernel':
+        specifier: workspace:*
+        version: link:../../packages/learning-kernel
+      '@ai-scholar/plugin-math':
+        specifier: workspace:*
+        version: link:../../packages/plugin-math
+      '@ai-scholar/session-contracts':
+        specifier: workspace:*
+        version: link:../../packages/session-contracts
+      '@fastify/websocket':
+        specifier: ^11.3.0
+        version: 11.3.0
+      fastify:
+        specifier: ^5.12.3
+        version: 5.12.3
+      zod:
+        specifier: ^4.5.4
+        version: 4.5.4
+    devDependencies:
+      '@types/ws':
+        specifier: ^8.18.0
+        version: 8.18.1
+      ws:
+        specifier: ^8.18.0
+        version: 8.21.3
+
   apps/gate-server:
     dependencies:
       '@ai-scholar/gate-contracts':
@@ -389,6 +417,9 @@ packages:
 
   '@types/node@26.4.1':
     resolution: {integrity: sha512-k97ENvZWtvA6yqz5/FS6a7duDgOPEeOQOc2iKS/nY6mX6qJUKtLnWzQS+Xj6tXweyj6ZcTAK2Qecetnvi9nCLA==}
+
+  '@types/ws@8.18.1':
+    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     resolution: {integrity: sha512-MTKKkWB7p/0E9xi1d1tHtZ5PiLkGEMIq88pK2CubZjOsLtYTLqhgIgi6zepFa+9GHZ6h05NMCkQxGKiPXMxXtQ==}
@@ -1176,6 +1207,10 @@ snapshots:
   '@types/node@26.4.1':
     dependencies:
       undici-types: 8.3.0
+
+  '@types/ws@8.18.1':
+    dependencies:
+      '@types/node': 26.4.1
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     optional: true

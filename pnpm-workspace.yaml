@@ -1,5 +1,6 @@
 packages:
   - apps/gate-server
+  - apps/agent-host
   - packages/*
   - tools/*
 

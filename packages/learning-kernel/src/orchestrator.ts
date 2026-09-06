@@ -70,8 +70,8 @@ export class SessionOrchestrator {
   }
 
   /** 第一步：同步进日志与存储。重放/缺口/冲突在这里就能回答，不等教学逻辑 */
-  acceptEvent(event: EvidenceEvent): AppendResult {
-    const append = this.log.append(event, this.deps.clock());
+  acceptEvent(event: EvidenceEvent, receivedAt: number = this.deps.clock()): AppendResult {
+    const append = this.log.append(event, receivedAt);
     if (append.kind === "appended") {
       this.deps.store.appendEvent(this.deps.sessionId, append.stored);
       this.eventsSinceSnapshot += 1;

@@ -10,7 +10,9 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "gate:server": "pnpm --filter @ai-scholar/gate-server start",
     "gate:codex": "pnpm --filter @ai-scholar/codex-realtime-probe start",
-    "gate:report": "pnpm --filter @ai-scholar/gate-report start"
+    "gate:report": "pnpm --filter @ai-scholar/gate-report start",
+    "host": "pnpm --filter @ai-scholar/agent-host start",
+    "session:replay": "pnpm --filter @ai-scholar/agent-host replay"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",

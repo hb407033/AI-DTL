@@ -1,0 +1,15 @@
+{
+  "name": "@ai-scholar/agent-host",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "tsx src/server.ts", "replay": "tsx src/replay-cli.ts", "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "@ai-scholar/learning-kernel": "workspace:*",
+    "@ai-scholar/plugin-math": "workspace:*",
+    "@ai-scholar/session-contracts": "workspace:*",
+    "@fastify/websocket": "^11.3.0",
+    "fastify": "^5.12.3",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": { "ws": "^8.18.0", "@types/ws": "^8.18.0" }
+}
