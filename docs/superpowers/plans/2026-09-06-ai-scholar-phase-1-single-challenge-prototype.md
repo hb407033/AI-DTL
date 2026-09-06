@@ -2413,7 +2413,7 @@ describe("15.3 场景：主动求助与提示阶梯", () => {
 
     const back = await h.send({ type: "STROKE", strokeId: "st-1", contentHash: "h1", bounds: { x: 0, y: 0, width: 1, height: 1 } });
     expect(h.orch.context).toMatchObject({ state: "INDEPENDENT", hintLevel: 0, maxHintLevelUsed: 1 });
-    expect(types(back)).toEqual(["stateChanged"]);
+    expect(types(back.outbound)).toEqual(["stateChanged"]);
 
     const second = await h.send({ type: "HELP_REQUEST" });
     expect(h.orch.context).toMatchObject({ state: "INTERVENING", hintLevel: 2, escalationCount: 2 });

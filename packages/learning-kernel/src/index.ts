@@ -9,3 +9,6 @@ export * from "./proposal-validator.js";
 export * from "./bridge.js";
 export * from "./bridges/scripted-replay-bridge.js";
 export * from "./bridges/parent-coach-bridge.js";
+export * from "./store.js";
+export * from "./sqlite-store.js";
+export * from "./orchestrator.js";
