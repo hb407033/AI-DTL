@@ -269,4 +269,5 @@ NSAppTransportSecurity:
 - 新计划 `docs/superpowers/plans/2026-09-06-ai-scholar-phase-1-single-challenge-prototype.md` 已按 12 个任务全部实现：`packages/session-contracts`（儿童端协议）、`packages/learning-kernel`（状态机、预算、事件日志、校验器、桥接、存储、编排器）、`packages/plugin-math`（2.4 × 0.3 薄切片）、`apps/agent-host`（`:8788` 会话网关 + 家长控制台 + SQLite）。
 - 验证：`pnpm test` 168 个用例通过（含 15.3 八个脚本场景），`pnpm typecheck` 通过，`pnpm session:replay` 终态 `COMPLETED`，`pnpm host` 冒烟可达。
 - 仍未开始：iPad 儿童端会话界面（可先在模拟器做）、`CodexRealtimeBridge`（待路线裁决）、长期记忆写入与断线恢复（阶段 2）。
+- 同日下午：儿童端 App `apps/ipad/ScholarPad`（独立于探针工程）在模拟器跑通——协议类型按契约夹具对齐、出站幂等队列、笔画差分、界面状态 reducer、WebSocket 客户端、PencilKit 画布 + Agent 语义层 + 说话输入 + 四个常驻按钮；单测 17 个、UI 冒烟 1 条（连本机脚本回放宿主）通过。语音仍用文字代替，Pencil 与真机待设备。
 
