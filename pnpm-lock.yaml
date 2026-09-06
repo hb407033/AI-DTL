@@ -42,6 +42,15 @@ importers:
         specifier: ^4.5.4
         version: 4.5.4
 
+  packages/learning-kernel:
+    dependencies:
+      '@ai-scholar/session-contracts':
+        specifier: workspace:*
+        version: link:../session-contracts
+      zod:
+        specifier: ^4.5.4
+        version: 4.5.4
+
   packages/session-contracts:
     dependencies:
       zod:

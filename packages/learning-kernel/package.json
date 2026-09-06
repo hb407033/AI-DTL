@@ -1,0 +1,8 @@
+{
+  "name": "@ai-scholar/learning-kernel",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "dependencies": { "@ai-scholar/session-contracts": "workspace:*", "zod": "^4.5.4" }
+}
