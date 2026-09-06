@@ -97,4 +97,6 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop()
   const script = scriptIndex >= 0 ? (JSON.parse(readFileSync(process.argv[scriptIndex + 1] ?? "", "utf8")) as ReplayScript) : undefined;
   const app = await buildHostServer({ bridge, script });
   await app.listen({ host: "0.0.0.0", port: PORT });
+  // 家长视图限本机：用 localhost 打开，换成 .local 主机名或局域网 IP 会被 403 挡掉
+  app.log.info(`儿童端连 ws://<本机名>:${PORT}/session，家长视图只能在本机打开 http://localhost:${PORT}/parent`);
 }
