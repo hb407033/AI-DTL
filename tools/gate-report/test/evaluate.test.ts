@@ -104,3 +104,15 @@ describe("总状态", () => {
     expect(md).toContain("d.json");
   });
 });
+
+describe("Codex 门禁的诊断信息", () => {
+  test("BLOCKED/FAIL 时把探针状态与会话错误原文列进原因，不吞掉", () => {
+    const result = evaluateCodex({
+      schemaVersion: 1, runId: "c", status: "FAIL", codexVersion: "0.153.4", account: { type: "chatgpt" }, usageAttribution: "unverified",
+      trials: [{ index: 1, ok: false, error: "realtime error（start 阶段）: realtime conversation requires API key auth" }],
+    });
+    expect(result.status).toBe("BLOCKED");
+    expect(result.reasons.join("\n")).toContain("探针状态：FAIL");
+    expect(result.reasons.join("\n")).toContain("requires API key auth");
+  });
+});

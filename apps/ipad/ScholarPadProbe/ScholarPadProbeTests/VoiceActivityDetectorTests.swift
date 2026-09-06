@@ -109,3 +109,22 @@ final class VoiceActivityDetectorOnsetTests: XCTestCase {
         XCTAssertEqual(d.push(rms: 0.05, frameMs: 20, tag: 202), .speechStarted(onsetTag: 200))
     }
 }
+
+final class VoiceActivityDetectorPeakCalibrationTests: XCTestCase {
+    /// 校准窗口里若出现短暂较响的帧（比如测试音刚起播），阈值不能只看均值，还要压过峰值：
+    /// 均值 0.008×3 = 0.024，峰值 0.02×1.5 = 0.03 → 取 0.03；随后 0.025 的持续帧不得触发
+    func testThresholdAlsoClearsCalibrationPeak() {
+        var d = VoiceActivityDetector(config: .init(calibrationMs: 100, noiseRatio: 3, peakRatio: 1.5, minThreshold: 0.01, attackMs: 60, releaseMs: 300))
+        _ = d.push(rms: 0.005, frameMs: 20)
+        _ = d.push(rms: 0.005, frameMs: 20)
+        _ = d.push(rms: 0.02, frameMs: 20)
+        _ = d.push(rms: 0.005, frameMs: 20)
+        guard case .calibrated(let threshold)? = d.push(rms: 0.005, frameMs: 20) else { return XCTFail("应完成校准") }
+        XCTAssertEqual(threshold, 0.03, accuracy: 1e-6)
+        for _ in 0..<10 { XCTAssertNil(d.push(rms: 0.025, frameMs: 20)) }
+    }
+
+    func testDefaultPeakRatioIsOnePointFive() {
+        XCTAssertEqual(VoiceActivityDetector.Config().peakRatio, 1.5, accuracy: 1e-6)
+    }
+}

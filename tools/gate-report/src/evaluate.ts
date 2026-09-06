@@ -78,16 +78,23 @@ export function evaluateDevice(input: unknown): GateResult {
 export function evaluateCodex(input: unknown): GateResult {
   const codex = codexResultSchema.parse(input);
   const reasons: string[] = [];
+  // 诊断信息永远列出：探针自己的状态与会话错误原文，方便 Task 10 直接看到"为什么"
+  const trialErrors = [...new Set(codex.trials.map((t) => (t as { error?: string }).error).filter((e): e is string => Boolean(e)))];
+  if (codex.status !== "PASS" || trialErrors.length > 0) {
+    reasons.push(`探针状态：${codex.status}${codex.blockedReason ? `（${codex.blockedReason}）` : ""}`);
+    for (const error of trialErrors) reasons.push(`会话错误：${error}`);
+  }
   if (codex.status === "BLOCKED") reasons.push(`探针 BLOCKED：${codex.blockedReason ?? "未说明"}`);
   if (codex.account?.type !== "chatgpt") reasons.push(`账户身份 ${codex.account?.type ?? "未知"}，必须是 chatgpt`);
   if (codex.usageAttribution !== "codex") reasons.push(`用量归属 ${codex.usageAttribution}，必须人工确认为 codex 订阅`);
-  if (reasons.length > 0) return { status: "BLOCKED", reasons, failures: [], findings: [] };
+  const blocking = reasons.filter((r) => !r.startsWith("探针状态：") && !r.startsWith("会话错误："));
+  if (blocking.length > 0) return { status: "BLOCKED", reasons, failures: [], findings: [] };
   const ok = codex.trials.filter((t) => t.ok).length;
   const need = Math.ceil(codex.trials.length * 0.95);
   if (codex.trials.length === 0 || ok < need) {
-    return { status: "FAIL", reasons: [`会话成功 ${ok}/${codex.trials.length}，需要 ≥ ${need}`], failures: [], findings: [] };
+    return { status: "FAIL", reasons: [...reasons, `会话成功 ${ok}/${codex.trials.length}，需要 ≥ ${need}`], failures: [], findings: [] };
   }
-  return { status: "PASS", reasons: [`会话成功 ${ok}/${codex.trials.length}`], failures: [], findings: [] };
+  return { status: "PASS", reasons: [...reasons, `会话成功 ${ok}/${codex.trials.length}`], failures: [], findings: [] };
 }
 
 export function evaluateWizard(input: unknown): GateResult {

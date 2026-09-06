@@ -36,6 +36,9 @@ actor AudioProbeCore {
     private var trialDeadline: Task<Void, Never>?
     private var detector: VoiceActivityDetector?
     private var trialActive = false
+    /// 起播后先忽略一小段帧再开始校准，否则播放节点的起播延迟会让校准窗口前半段是安静的、把噪声底拉低
+    private var trialStartedHostTime: UInt64 = 0
+    private static let calibrationDelayMs: Double = 300
     private var toneBuffer: AVAudioPCMBuffer?
     private var recordingSink: RecordingSink?
     private var playbackFormat: AVAudioFormat?
@@ -180,6 +183,7 @@ actor AudioProbeCore {
         trialActive = true
         player.scheduleBuffer(tone, at: nil, options: [])
         player.play()
+        trialStartedHostTime = mach_absolute_time()
         emit(.status("正在播放测试音，请开口说话…"))
         trialDeadline?.cancel()
         trialDeadline = Task { [weak self] in
@@ -205,6 +209,7 @@ actor AudioProbeCore {
 
     private func handle(_ frame: TapFrame) {
         guard trialActive, detector != nil else { return }
+        guard ms(from: trialStartedHostTime, to: frame.hostTime) >= Self.calibrationDelayMs else { return }
         guard let event = detector!.push(rms: frame.rms, frameMs: frame.frameMs, tag: frame.hostTime) else { return }
         switch event {
         case .calibrated(let threshold):

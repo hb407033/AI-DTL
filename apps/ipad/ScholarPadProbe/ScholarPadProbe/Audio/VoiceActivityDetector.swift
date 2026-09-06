@@ -7,6 +7,8 @@ struct VoiceActivityDetector {
     struct Config: Equatable {
         var calibrationMs: Double = 1000
         var noiseRatio: Float = 3
+        /// 阈值还要压过校准窗口里的峰值：测试音起播、椅子响一下这类短暂较响的帧不能一结束校准就被当成开口
+        var peakRatio: Float = 1.5
         var minThreshold: Float = 0.01
         var attackMs: Double = 60
         var releaseMs: Double = 300
@@ -25,6 +27,7 @@ struct VoiceActivityDetector {
 
     private var calibrationElapsedMs = 0.0
     private var calibrationWeightedRms = 0.0
+    private var calibrationPeakRms: Float = 0
     private var speaking = false
     private var aboveMs = 0.0
     private var belowMs = 0.0
@@ -38,9 +41,10 @@ struct VoiceActivityDetector {
         guard let threshold else {
             calibrationElapsedMs += frameMs
             calibrationWeightedRms += Double(rms) * frameMs   // 按时长加权，长短帧混用也不偏
+            calibrationPeakRms = max(calibrationPeakRms, rms)
             guard calibrationElapsedMs >= config.calibrationMs else { return nil }
             let noiseFloor = Float(calibrationWeightedRms / calibrationElapsedMs)
-            let resolved = max(config.minThreshold, noiseFloor * config.noiseRatio)
+            let resolved = max(config.minThreshold, noiseFloor * config.noiseRatio, calibrationPeakRms * config.peakRatio)
             self.threshold = resolved
             return .calibrated(threshold: resolved)
         }
