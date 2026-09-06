@@ -41,12 +41,14 @@
 
 **测试**：设计稿 §13 的 `growth/discrete-guard.test.ts`（1–7）、`growth/forbidden-labels.test.ts`（8–14）、`store.test.ts` 改动（162–164）
 
-- [ ] Step 1：写 `discrete-guard.test.ts` 与 `forbidden-labels.test.ts`（设计稿测试 1–14），跑，确认红
-- [ ] Step 2：实现 `constants.ts` / `types.ts` / `discrete-guard.ts` / `forbidden-labels.ts` / `child-text.ts`，跑到绿
-- [ ] Step 3：写 `store.test.ts` 的三参数契约测试（162–164），确认红
-- [ ] Step 4：实现 `database.ts`，改 `sqlite-store.ts` 接收注入 db，补 `SessionStore` 三处扩展与内存实现，改宿主构造点
-- [ ] Step 5：`pnpm test` + `pnpm typecheck` 全绿；`kernel-purity` 绿
-- [ ] Step 6：提交「建立成长记忆层地基：同库同连接与离散守卫、禁止标签、儿童版文案」
+- [x] Step 1：写 `discrete-guard.test.ts` 与 `forbidden-labels.test.ts`（设计稿测试 1–14），跑，确认红
+- [x] Step 2：实现 `constants.ts` / `types.ts` / `discrete-guard.ts` / `forbidden-labels.ts` / `child-text.ts`，跑到绿
+- [x] Step 3：写 `store.test.ts` 的三参数契约测试（162–164），确认红
+- [x] Step 4：实现 `database.ts`，改 `sqlite-store.ts` 接收注入 db，补 `SessionStore` 三处扩展与内存实现，改宿主构造点
+- [x] Step 5：`pnpm test` + `pnpm typecheck` 全绿；`kernel-purity` 绿
+- [x] Step 6：提交「建立成长记忆层地基：同库同连接与三个纯函数」
+
+**批 1 回写（2026-09-06）**：✅ 完成，全仓 217 个测试通过。⚠️ 设计稿 §9.2 把 `scaffold_points` 与 `contests` 两张表写成了省略号，已按 §6.1 与 §8.2 的字段清单补全并写回设计稿。⚠️ `events_artifact` 索引依赖会话表，从成长建表挪到会话建表里。⚠️ `SqliteSessionStore.close()` 删除——连接由持有方（宿主）负责关，存储不再关别人的库。旧库（9 个历史会话）用 `PRAGMA table_info` 判断后 ALTER 补列，平滑迁移已实测。
 
 ## 批 2：插件契约扩展、证据链接与假设生命周期
 

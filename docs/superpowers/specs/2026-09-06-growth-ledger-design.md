@@ -1164,7 +1164,18 @@ CREATE TABLE IF NOT EXISTS round_active_candidates (
   demoted_at INTEGER, PRIMARY KEY (run_id, hypothesis_key));
 
 -- ══ SDP 与趋势洞 ══（列见 §6.1）
-CREATE TABLE IF NOT EXISTS scaffold_points ( … );
+CREATE TABLE IF NOT EXISTS scaffold_points (
+  point_id TEXT PRIMARY KEY, learner_id TEXT NOT NULL, run_id TEXT NOT NULL, challenge_id TEXT NOT NULL,
+  goal_kind TEXT NOT NULL DEFAULT 'developmentGoal' CHECK (goal_kind = 'developmentGoal'),
+  goal_id TEXT NOT NULL, probe_family_id TEXT NOT NULL,
+  difficulty_band TEXT NOT NULL, difficulty_band_index INTEGER NOT NULL,
+  max_hint_level_used INTEGER NOT NULL, escalation_count INTEGER NOT NULL, probes_issued INTEGER NOT NULL,
+  independent_transfer_succeeded INTEGER NOT NULL,
+  time_to_first_productive_action_ms INTEGER,
+  self_correction_observed INTEGER NOT NULL, assisted_round INTEGER NOT NULL,
+  occurred_at INTEGER NOT NULL,
+  written_by TEXT NOT NULL CHECK (written_by = 'GrowthLedgerService'),
+  UNIQUE (run_id, goal_id));
 CREATE INDEX IF NOT EXISTS sdp_window ON scaffold_points(learner_id, goal_id, probe_family_id, difficulty_band_index, occurred_at);
 CREATE TABLE IF NOT EXISTS trend_gaps (
   gap_id TEXT PRIMARY KEY, learner_id TEXT NOT NULL, goal_id TEXT NOT NULL, probe_family_id TEXT NOT NULL,
@@ -1237,7 +1248,14 @@ CREATE INDEX IF NOT EXISTS rec_active ON growth_records(learner_id, discipline, 
 CREATE INDEX IF NOT EXISTS rec_due    ON growth_records(learner_id, next_verification_due_at);
 
 -- ══ 异议、冷却、信号、删除请求、知情、审计 ══
-CREATE TABLE IF NOT EXISTS contests ( … );            -- §8.2
+CREATE TABLE IF NOT EXISTS contests (
+  contest_id TEXT PRIMARY KEY, learner_id TEXT NOT NULL,
+  subject_kind TEXT NOT NULL CHECK (subject_kind IN ('proposal','hypothesis','record','candidate','session')),
+  subject_id TEXT NOT NULL, session_id TEXT NOT NULL, run_id TEXT, event_id TEXT NOT NULL,
+  claim_keys_json TEXT NOT NULL DEFAULT '[]',
+  contested_at INTEGER NOT NULL, resolved_at INTEGER, resolved_by_run_id TEXT,
+  resolution TEXT CHECK (resolution IS NULL OR resolution IN ('resolved','withdrawn')));
+CREATE INDEX IF NOT EXISTS contests_open ON contests(learner_id, resolved_at);   -- §8.2
 CREATE TABLE IF NOT EXISTS contest_frozen_links (contest_id TEXT NOT NULL, link_id TEXT NOT NULL, PRIMARY KEY (contest_id, link_id));
 CREATE TABLE IF NOT EXISTS contest_frozen_points (contest_id TEXT NOT NULL, point_id TEXT NOT NULL, PRIMARY KEY (contest_id, point_id));
 
