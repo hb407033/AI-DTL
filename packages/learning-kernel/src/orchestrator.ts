@@ -1,7 +1,7 @@
 // packages/learning-kernel/src/orchestrator.ts
 // 会话编排器：把儿童端事件变成状态机信号，按 5.0 表推进，在需要教学动作时向 RealtimeBridge 要提案、
 // 经本地校验后转成儿童端出站消息，并把事件、提案裁决与快照落盘。时钟注入，窗口与超时用 tick(now) 驱动，便于确定性测试。
-import type { ChildOutbound, EvidenceEvent, TeachingProposal } from "@ai-scholar/session-contracts";
+import type { ChildOutbound, EvidenceEvent, SemanticObject, TeachingProposal } from "@ai-scholar/session-contracts";
 import type { RealtimeBridge, TurnContext, TurnPurpose } from "./bridge.js";
 import type { ChallengeInput, DisciplineEvidence, LearningChallenge } from "./challenge.js";
 import { EventLog, type AppendResult, type StoredEvent } from "./event-log.js";
@@ -9,7 +9,7 @@ import { clampBudget, evaluateEscalation, nextHintRung, type InterventionBudget 
 import type { DisciplinePlugin } from "./plugin.js";
 import { validateProposal } from "./proposal-validator.js";
 import { createSessionContext, transition, type SessionContext, type Signal } from "./session-state.js";
-import { shouldSnapshot, type SessionStore } from "./store.js";
+import { shouldSnapshot, type OrchestratorRuntime, type SessionStore } from "./store.js";
 
 export interface OrchestratorDeps {
   sessionId: string;
@@ -38,11 +38,13 @@ export class SessionOrchestrator {
   transferChallenge: LearningChallenge | null = null;
   evidence: DisciplineEvidence[] = [];
   private budget: InterventionBudget;
-  private readonly log = new EventLog();
-  private readonly erasedHashes = new Set<string>();
-  private readonly agentObjectIds: string[] = [];
-  private readonly childObjectIds: string[] = [];
+  private log = new EventLog();
+  private erasedHashes = new Set<string>();
+  private agentObjects: SemanticObject[] = [];
+  private childObjectIds: string[] = [];
   private lastProposalId: string | null = null;
+  private lastLearnerTask = "";
+  private lastSpoken: string | null = null;
   private windowStartedAt = 0;
   private lastNewStrategyAt = 0;
   private confirmationAskedAt: number | null = null;
@@ -57,6 +59,80 @@ export class SessionOrchestrator {
     this.budget = clampBudget(this.challenge.interventionBudget);
   }
 
+  /** 宿主重启：从最新快照重建，快照之后的事件只灌回日志与证据，不触发桥接、不重发提示。库里没有则返回 null */
+  static restore(deps: OrchestratorDeps): SessionOrchestrator | null {
+    const snapshot = deps.store.latestSnapshot(deps.sessionId);
+    if (!snapshot) return null;
+    const orch = new SessionOrchestrator(deps);
+    orch.context = snapshot.context;
+    orch.challenge = snapshot.challenge;
+    orch.transferChallenge = snapshot.transferChallenge;
+    orch.evidence = [...snapshot.evidence];
+    orch.budget = clampBudget(orch.challenge.interventionBudget);
+    orch.snapshotSeq = snapshot.snapshotSeq;
+    orch.lastSnapshotAt = snapshot.createdAt;
+    if (snapshot.runtime) {
+      orch.erasedHashes = new Set(snapshot.runtime.erasedHashes);
+      orch.agentObjects = [...snapshot.runtime.agentObjects];
+      orch.childObjectIds = [...snapshot.runtime.childObjectIds];
+      orch.lastProposalId = snapshot.runtime.lastProposalId;
+      orch.lastLearnerTask = snapshot.runtime.lastLearnerTask;
+      orch.lastSpoken = snapshot.runtime.lastSpoken;
+      orch.windowStartedAt = snapshot.runtime.windowStartedAt;
+      orch.lastNewStrategyAt = snapshot.runtime.lastNewStrategyAt;
+    }
+    const events = deps.store.listEvents(deps.sessionId);
+    orch.log = new EventLog(events);
+    for (const stored of events) {
+      if (stored.event.clientSeq > snapshot.lastConfirmedSeq) {
+        orch.absorb(stored.event);
+        orch.eventsSinceSnapshot += 1;
+      }
+    }
+    return orch;
+  }
+
+  /** 儿童端断线：进入 PAUSED_TECH，停计时、停能力判断。非活动状态下无事发生 */
+  techInterrupted(): ChildOutbound[] {
+    const out: ChildOutbound[] = [];
+    if (this.apply({ kind: "techInterrupted" }, out)) this.snapshotIfNeeded(true, this.deps.clock());
+    return out;
+  }
+
+  /** 儿童端重连：快照之前的事件都已落盘，检查点视为一致，回原状态并从现在重新计窗口 */
+  techRecovered(): ChildOutbound[] {
+    const out: ChildOutbound[] = [];
+    const now = this.deps.clock();
+    if (this.apply({ kind: "techRecovered", checkpointConsistent: true }, out)) {
+      this.beginWindow(now);
+      this.snapshotIfNeeded(true, now);
+    }
+    return out;
+  }
+
+  /** 当前画面：重连或重开 App 时发给儿童端，让它不靠历史消息也能画出现在的状态 */
+  viewSnapshot(): ChildOutbound[] {
+    const out: ChildOutbound[] = [];
+    let n = 0;
+    const id = () => `snap-${++n}`;
+    out.push({ type: "stateChanged", id: id(), state: this.context.state, hintLevel: this.context.hintLevel, presence: presenceFor(this.context.state) });
+    if (this.lastLearnerTask) out.push({ type: "learnerTask", id: id(), text: this.lastLearnerTask });
+    for (const object of this.agentObjects) out.push({ type: "canvasAction", id: id(), action: { kind: "upsertObject", object } });
+    if (this.lastSpoken !== null) out.push({ type: "speak", id: id(), text: this.lastSpoken, hintLevel: this.context.hintLevel, interruptible: true });
+    return out;
+  }
+
+  /** 重建时把快照之后的事件只当证据吸收：不改状态、不请求桥接 */
+  private absorb(event: EvidenceEvent): void {
+    const p = event.payload;
+    if (p.type === "ERASE") { this.erasedHashes.add(p.contentHash); return; }
+    if (p.type === "STROKE") this.childObjectIds.push(p.strokeId);
+    const interpretable = p.type === "STROKE" || p.type === "UTTERANCE" || p.type === "ANSWER" || p.type === "EXPLAIN" || p.type === "SELECT" || p.type === "DRAG";
+    if (!interpretable || event.quality === "unconfirmed") return;
+    const current = this.context.state === "TRANSFER" && this.transferChallenge ? this.transferChallenge : this.challenge;
+    this.evidence.push(...this.deps.plugin.interpretEvent(current, event, this.evidence));
+  }
+
   async start(): Promise<ChildOutbound[]> {
     const now = this.deps.clock();
     this.deps.store.createSession({ sessionId: this.deps.sessionId, discipline: this.deps.plugin.manifest.id, challenge: this.challenge, createdAt: now });
@@ -64,7 +140,7 @@ export class SessionOrchestrator {
     const out: ChildOutbound[] = [];
     this.apply({ kind: "challengeValidated" }, out);
     this.beginWindow(now);
-    out.push(this.msg({ type: "learnerTask", text: this.challenge.learnerPrompt }));
+    this.pushTask(this.challenge.learnerPrompt, out);
     this.snapshotIfNeeded(true, now);
     return out;
   }
@@ -130,7 +206,7 @@ export class SessionOrchestrator {
       case "RESUME_REQUEST": this.apply({ kind: "resume" }, out); return;
       case "CONTEST":
         if (this.apply({ kind: "contest", targetId: p.targetId ?? this.lastProposalId ?? undefined }, out)) {
-          out.push(this.msg({ type: "speak", text: CONTEST_QUESTION, hintLevel: 0, interruptible: true }));
+          this.pushSpeak(CONTEST_QUESTION, 0, out);
         }
         return;
       case "HELP_REQUEST":
@@ -252,7 +328,7 @@ export class SessionOrchestrator {
     this.emitProposal(proposal, out);
     if (proposal.hintLevel === 4 && this.apply({ kind: "demoIssued" }, out)) {
       this.withdrawAgentObjects(out);
-      out.push(this.msg({ type: "learnerTask", text: proposal.learnerTask }));
+      this.pushTask(proposal.learnerTask, out);
     }
   }
 
@@ -263,26 +339,31 @@ export class SessionOrchestrator {
   }
 
   private emitProposal(proposal: TeachingProposal, out: ChildOutbound[]): void {
-    out.push(this.msg({ type: "speak", text: proposal.spokenResponse, hintLevel: proposal.hintLevel, interruptible: true }));
+    this.pushSpeak(proposal.spokenResponse, proposal.hintLevel, out);
     for (const action of proposal.canvasActions) {
-      if (action.kind === "upsertObject") this.agentObjectIds.push(action.object.id);
+      if (action.kind === "upsertObject") {
+        const index = this.agentObjects.findIndex((o) => o.id === action.object.id);
+        if (index >= 0) this.agentObjects[index] = action.object; else this.agentObjects.push(action.object);
+      } else if (action.kind === "removeObject") {
+        this.agentObjects = this.agentObjects.filter((o) => o.id !== action.objectId);
+      }
       out.push(this.msg({ type: "canvasAction", action }));
     }
-    out.push(this.msg({ type: "learnerTask", text: proposal.learnerTask }));
+    this.pushTask(proposal.learnerTask, out);
   }
 
   private withdrawAgentObjects(out: ChildOutbound[]): void {
-    for (const objectId of this.agentObjectIds.splice(0)) out.push(this.msg({ type: "canvasAction", action: { kind: "removeObject", objectId } }));
+    for (const object of this.agentObjects.splice(0)) out.push(this.msg({ type: "canvasAction", action: { kind: "removeObject", objectId: object.id } }));
   }
 
   private enterExplainBack(out: ChildOutbound[]): void {
-    out.push(this.msg({ type: "learnerTask", text: this.challenge.explainBackSpec.prompt }));
+    this.pushTask(this.challenge.explainBackSpec.prompt, out);
   }
 
   private enterTransfer(out: ChildOutbound[], now: number): void {
     this.transferChallenge = this.deps.plugin.createTransfer(this.challenge);
     this.beginWindow(now);
-    out.push(this.msg({ type: "learnerTask", text: this.transferChallenge.learnerPrompt }));
+    this.pushTask(this.transferChallenge.learnerPrompt, out);
   }
 
   private async handleSoftLandingChoice(choice: "simpler" | "hint" | "stop", out: ChildOutbound[], now: number): Promise<void> {
@@ -294,7 +375,7 @@ export class SessionOrchestrator {
       this.evidence = [];
       this.apply({ kind: "challengeValidated" }, out);
       this.beginWindow(now);
-      out.push(this.msg({ type: "learnerTask", text: this.challenge.learnerPrompt }));
+      this.pushTask(this.challenge.learnerPrompt, out);
     } else if (choice === "hint") {
       await this.requestHint(Math.min(nextHintRung(this.context), this.budget.maxHintLevel), out);
     }
@@ -307,8 +388,7 @@ export class SessionOrchestrator {
     this.context = result.context;
     if (!result.ok) return false;
     if (this.context.state !== before) {
-      const presence = this.context.state === "PAUSED_CHILD" || this.context.state === "PAUSED_TECH" ? "paused" : this.context.state === "WAITING_CONFIRMATION" ? "waiting" : "listening";
-      out.push(this.msg({ type: "stateChanged", state: this.context.state, hintLevel: this.context.hintLevel, presence }));
+      out.push(this.msg({ type: "stateChanged", state: this.context.state, hintLevel: this.context.hintLevel, presence: presenceFor(this.context.state) }));
     }
     return true;
   }
@@ -322,6 +402,24 @@ export class SessionOrchestrator {
 
   private beginWindow(now: number): void { this.windowStartedAt = now; this.lastNewStrategyAt = now; }
 
+  private pushTask(text: string, out: ChildOutbound[]): void {
+    this.lastLearnerTask = text;
+    out.push(this.msg({ type: "learnerTask", text }));
+  }
+
+  private pushSpeak(text: string, hintLevel: number, out: ChildOutbound[]): void {
+    this.lastSpoken = text;
+    out.push(this.msg({ type: "speak", text, hintLevel, interruptible: true }));
+  }
+
+  private runtime(): OrchestratorRuntime {
+    return {
+      erasedHashes: [...this.erasedHashes], agentObjects: [...this.agentObjects], childObjectIds: [...this.childObjectIds],
+      lastProposalId: this.lastProposalId, lastLearnerTask: this.lastLearnerTask, lastSpoken: this.lastSpoken,
+      windowStartedAt: this.windowStartedAt, lastNewStrategyAt: this.lastNewStrategyAt,
+    };
+  }
+
   private msg(body: OutboundBody): ChildOutbound {
     this.outboundCounter += 1;
     return { ...body, id: `o-${this.outboundCounter}` } as ChildOutbound;
@@ -332,9 +430,13 @@ export class SessionOrchestrator {
     this.snapshotSeq += 1;
     this.deps.store.saveSnapshot(this.deps.sessionId, {
       snapshotSeq: this.snapshotSeq, context: this.context, lastConfirmedSeq: this.log.lastConfirmedSeq,
-      challenge: this.challenge, transferChallenge: this.transferChallenge, evidence: this.evidence, createdAt: now,
+      challenge: this.challenge, transferChallenge: this.transferChallenge, evidence: [...this.evidence], createdAt: now, runtime: this.runtime(),
     });
     this.eventsSinceSnapshot = 0;
     this.lastSnapshotAt = now;
   }
+}
+
+function presenceFor(state: SessionContext["state"]): "listening" | "waiting" | "paused" {
+  return state === "PAUSED_CHILD" || state === "PAUSED_TECH" ? "paused" : state === "WAITING_CONFIRMATION" ? "waiting" : "listening";
 }
