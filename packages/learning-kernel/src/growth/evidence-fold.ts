@@ -75,7 +75,16 @@ export function foldRunDirection(links: readonly ClaimEvidenceLink[]): "supports
  * 一轮里说得多的孩子不该因此显得证据更足。
  */
 export function summarizeClaim(links: readonly ClaimEvidenceLink[], runs: readonly ChallengeRun[]): DiscreteCounts {
-  const active = links.filter((l) => l.status === "active" && l.hypothesisKey === null);
+  return summarizeFor(links, runs, null);
+}
+
+/** 同一口径按假设算一份，供假设生命周期使用 */
+export function summarizeHypothesis(links: readonly ClaimEvidenceLink[], runs: readonly ChallengeRun[], hypothesisKey: string): DiscreteCounts {
+  return summarizeFor(links, runs, hypothesisKey);
+}
+
+function summarizeFor(links: readonly ClaimEvidenceLink[], runs: readonly ChallengeRun[], hypothesisKey: string | null): DiscreteCounts {
+  const active = links.filter((l) => l.status === "active" && l.hypothesisKey === hypothesisKey);
   const byRun = new Map<string, ClaimEvidenceLink[]>();
   for (const link of active) byRun.set(link.runId, [...(byRun.get(link.runId) ?? []), link]);
 

@@ -17,3 +17,7 @@ export * from "./growth/database.js";
 export * from "./growth/discrete-guard.js";
 export * from "./growth/forbidden-labels.js";
 export * from "./growth/child-text.js";
+export * from "./growth/constants.js";
+export * from "./growth/types.js";
+export * from "./growth/evidence-fold.js";
+export * from "./growth/hypothesis.js";

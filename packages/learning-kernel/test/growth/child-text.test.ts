@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { screenChildFacingText } from "../../src/growth/forbidden-labels.js";
-import { renderChildFacingText, renderEvidenceSummaryText, renderScaffoldLine, type DiscreteCounts } from "../../src/growth/child-text.js";
+import { renderChildFacingText, renderEvidenceSummaryText, renderScaffoldLine } from "../../src/growth/child-text.js";
+import type { DiscreteCounts } from "../../src/growth/types.js";
 
 // 孩子读到的每一句都由模板拼装，模板里只有连接词与整数；具体的词来自插件。
 // 家长与模型因此在结构上写不出一句孩子没看过的话（设计稿 §2.7、规范 9.5）。

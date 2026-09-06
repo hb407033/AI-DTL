@@ -1,14 +1,8 @@
 // 孩子会看到的每一句结论都由这里的模板拼装（成长记忆层设计稿 §2.7）。
 // 账本里没有任何自由描述字段：模板里只有连接词与整数，具体的词全部来自学科插件提供的儿童版短语。
 // 这样家长与模型在结构上就写不出一句孩子没看过、也没同意过的话。
+import type { DiscreteCounts } from "./types.js";
 
-export interface DiscreteCounts {
-  supportingChallenges: number;
-  refutingChallenges: number;
-  distinctSurfaceContexts: number;
-  independentTransferSuccesses: number;
-  hintedSuccesses: number;
-}
 
 /** 拟写入的成长记录，讲给孩子听的那一句 */
 export function renderChildFacingText(input: {

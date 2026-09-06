@@ -63,3 +63,15 @@ describe("成长层内核纯净度", () => {
     expect(offenders.map((f) => f.split("/growth/")[1])).toEqual([]);
   });
 });
+
+describe("成长层判定的确定性", () => {
+  test("growth 目录下不出现 Date.now：过期与冷却必须由注入的时刻驱动", () => {
+    const dir = new URL("../../src/growth", import.meta.url).pathname;
+    const walk = (d: string): string[] => readdirSync(d).flatMap((n) => {
+      const full = join(d, n);
+      return statSync(full).isDirectory() ? walk(full) : full.endsWith(".ts") ? [full] : [];
+    });
+    const offenders = walk(dir).filter((f) => /Date\.now|new Date\(/.test(readFileSync(f, "utf8")));
+    expect(offenders.map((f) => f.split("/growth/")[1])).toEqual([]);
+  });
+});
