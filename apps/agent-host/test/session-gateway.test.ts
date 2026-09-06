@@ -56,3 +56,42 @@ describe("会话网关", () => {
     expect(host.parentView("s-1")).toMatchObject({ state: "INTERVENING", hintLevel: 1, pending: null });
   });
 });
+
+describe("断线暂停与重启续接（设计稿 13）", () => {
+  const script = () => new ScriptedReplayBridge({ scriptVersion: 1, turns: [
+    { purpose: "hint", proposal: { proposalId: "p-1", spokenResponse: "你现在已经确定了什么？", learnerTask: "说说", canvasActions: [{ kind: "upsertObject", object: { id: "agent-bar", owner: "agent", kind: "tenthsBar", props: {} } }], expectedEvidence: [], hintLevel: 1 } },
+  ] });
+
+  test("儿童端 socket 断开 → PAUSED_TECH；重新打开 → 回原状态并收到当前画面", async () => {
+    const host = createSessionHost({ plugin: mathPlugin, store: new InMemorySessionStore(), makeBridge: script, clock: () => 5 });
+    await host.open("s-1");
+    await host.handleFrame("s-1", frame("f-1", 1, { type: "HELP_REQUEST" }), 10);
+    await host.idle("s-1");
+    expect(host.parentView("s-1").state).toBe("INTERVENING");
+
+    host.onSocketClosed("s-1");
+    expect(host.parentView("s-1").state).toBe("PAUSED_TECH");
+
+    const reopened = await host.open("s-1");
+    expect(host.parentView("s-1").state).toBe("INTERVENING");
+    const kinds = reopened.map((f) => (f.type === "outbound" ? f.message.type : f.type));
+    expect(kinds).toEqual(["stateChanged", "learnerTask", "canvasAction", "speak", "stateChanged"]);   // 画面快照 + 恢复通知
+  });
+
+  test("宿主重启：新 host 用同一个 store 打开旧会话，得到当前画面；旧帧重放仍是原 ack", async () => {
+    const store = new InMemorySessionStore();
+    const first = createSessionHost({ plugin: mathPlugin, store, makeBridge: script, clock: () => 5 });
+    await first.open("s-1");
+    const ack = await first.handleFrame("s-1", frame("f-1", 1, { type: "HELP_REQUEST" }), 10);
+    await first.idle("s-1");
+
+    const second = createSessionHost({ plugin: mathPlugin, store, makeBridge: script, clock: () => 99 });
+    const frames = await second.open("s-1");
+    expect(second.parentView("s-1")).toMatchObject({ state: "INTERVENING", hintLevel: 1 });
+    expect(frames.some((f) => f.type === "outbound" && f.message.type === "canvasAction")).toBe(true);
+    const replay = await second.handleFrame("s-1", frame("f-1", 1, { type: "HELP_REQUEST" }), 200);
+    expect(replay[0]).toEqual(ack[0]);
+    const next = await second.handleFrame("s-1", frame("f-2", 2, { type: "ANSWER", text: "0.72" }), 201);
+    expect(next[0]).toMatchObject({ type: "ack", clientSeq: 2 });
+  });
+});

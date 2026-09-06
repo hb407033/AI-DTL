@@ -54,7 +54,7 @@ export async function buildHostServer(options: HostServerOptions) {
     const unsubscribe = host.subscribe(sessionId, send);
     send(await host.open(sessionId));
     socket.on("message", async (raw: Buffer | string) => send(await host.handleFrame(sessionId, raw.toString(), Date.now())));
-    socket.on("close", () => { unsubscribe(); request.log.info({ sessionId }, "儿童端断开"); });
+    socket.on("close", () => { unsubscribe(); host.onSocketClosed(sessionId); request.log.info({ sessionId }, "儿童端断开，教学暂停"); });
   });
 
   app.get("/parent", async (_request, reply) => reply.type("text/html; charset=utf-8").send(consoleHtml));

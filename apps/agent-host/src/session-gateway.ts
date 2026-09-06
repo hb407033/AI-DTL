@@ -57,17 +57,34 @@ export function createSessionHost(options: SessionHostOptions) {
       return bridge;
     },
 
+    /** 三种打开：进程内已有 → 续接（技术中断恢复 + 当前画面）；库里有 → 重启后重建；都没有 → 新会话 */
     async open(sessionId: string): Promise<ServerFrame[]> {
       const existing = sessions.get(sessionId);
-      if (existing) return [];
+      if (existing) {
+        return wrap([...existing.orchestrator.viewSnapshot(), ...existing.orchestrator.techRecovered()]);
+      }
       const bridge = options.makeBridge(sessionId);
       if (bridge instanceof ParentCoachBridge) parentBridges.set(sessionId, bridge);
-      const orchestrator = new SessionOrchestrator({
+      const deps = {
         sessionId, plugin: options.plugin, bridge, store: options.store, clock: options.clock,
         challengeInput: { curriculumAnchor: options.curriculumAnchor ?? options.plugin.manifest.curriculumVersions[0] ?? "" },
-      });
+      };
+      const restored = SessionOrchestrator.restore(deps);
+      if (restored) {
+        sessions.set(sessionId, { orchestrator: restored, bridge, chain: Promise.resolve() });
+        return wrap([...restored.viewSnapshot(), ...restored.techRecovered()]);
+      }
+      const orchestrator = new SessionOrchestrator(deps);
       sessions.set(sessionId, { orchestrator, bridge, chain: Promise.resolve() });
       return wrap(await orchestrator.start());
+    },
+
+    /** 儿童端断开：教学进入 PAUSED_TECH，停计时、停能力判断；会话对象留在进程里等重连 */
+    onSocketClosed(sessionId: string): void {
+      const session = sessions.get(sessionId);
+      if (!session) return;
+      const frames = wrap(session.orchestrator.techInterrupted());
+      if (frames.length > 0) host.broadcast(sessionId, frames);
     },
 
     /** 只回 ack/nack/error；教学输出经 subscribe 推送。重放时把当时的出站消息一并补发 */
