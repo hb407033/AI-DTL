@@ -6,7 +6,8 @@
 //     孩子绕道求助去评估再拿提示同样算。重进迁移不清，只有开新一轮才清。
 // 二、辅助轮是粘性的：本轮曾经为真就一直为真，不被后续状态洗掉。软着陆之后换简单题，
 //     新一轮的记账清零，但辅助标记会立刻被重新置上，脚手架点因此绑定本次挑战而不是上一题。
-import type { DisciplineEvidence, LearningChallenge } from "../challenge.js";
+import type { DisciplineEvidence, HypothesisSupport, LearningChallenge } from "../challenge.js";
+import { PROBE_BUDGET } from "./probe-selection.js";
 import { claimKeyOf } from "./constants.js";
 import type { ChallengeRun } from "./types.js";
 
@@ -36,7 +37,9 @@ interface RunFacts {
   maxHintLevelUsed: number;
   escalationCount: number;
   probesIssued: number;
+  newOutputSinceLastProbe: boolean;
   usedProbeIds: string[];
+  issuedPair?: readonly [string, string];
   discriminates: string[];
   probeResolved: boolean;
   transferOpen: boolean;
@@ -79,7 +82,7 @@ export class RunRecorder {
       firstServerSeq,
       lastServerSeq: firstServerSeq,
       artifactVersionIds: [],
-      maxHintLevelUsed: 0, escalationCount: 0, probesIssued: 0, usedProbeIds: [], discriminates: [], probeResolved: false,
+      maxHintLevelUsed: 0, escalationCount: 0, probesIssued: 0, newOutputSinceLastProbe: false, usedProbeIds: [], discriminates: [], probeResolved: false,
       transferOpen: false, transferOutcome: "none", transferHintLevelUsed: 0, transferTainted: false,
       reconstructed: false, assistedRound: false, selfCorrectionObserved: false,
       firstProductiveActionAt: null,
@@ -98,7 +101,17 @@ export class RunRecorder {
     if (this.run.firstProductiveActionAt === null) this.run.firstProductiveActionAt = at;
   }
 
-  noteChildOutput(at: number): void { this.noteFirstProductiveAction(at); }
+  noteChildOutput(at: number): void {
+    this.noteFirstProductiveAction(at);
+    this.run.newOutputSinceLastProbe = true;
+  }
+
+  get newOutputSinceLastProbe(): boolean { return this.run.newOutputSinceLastProbe; }
+
+  canIssueProbe(): boolean {
+    return this.run.probesIssued < PROBE_BUDGET.maxPerRun
+      && (this.run.probesIssued === 0 || this.run.newOutputSinceLastProbe);
+  }
 
   noteHint(level: number, _at: number): void {
     const run = this.run;
@@ -122,19 +135,31 @@ export class RunRecorder {
 
   noteAssisted(): void { this.run.assistedRound = true; }
 
-  noteProbeIssued(probeId: string, discriminates: readonly [string, string], _at: number): void {
+  noteProbeIssued(probeId: string, discriminates: readonly [string, string], _at: number): boolean {
+    if (!this.canIssueProbe()) return false;
     const run = this.run;
     run.probesIssued += 1;
     run.usedProbeIds.push(probeId);
-    for (const key of discriminates) if (!run.discriminates.includes(key)) run.discriminates.push(key);
+    run.issuedPair = discriminates;
+    run.newOutputSinceLastProbe = false;
+    return true;
   }
 
-  noteProbeOutcome(_outcomeKey: string, separated: boolean): void {
-    if (separated) this.run.probeResolved = true;
+  noteProbeOutcome(outcomeKey: string, support: readonly HypothesisSupport[]): void {
+    if (!outcomeKey || this.run.probesIssued === 0) return;
+    const [a, b] = this.run.issuedPair ?? [];
+    if (!a || !b) return;
+    const da = support.find((s) => s.hypothesisId === a)?.direction;
+    const db = support.find((s) => s.hypothesisId === b)?.direction;
+    if (da && db && da !== db) {
+      this.run.probeResolved = true;
+      this.run.discriminates = [a, b];
+    }
   }
 
   noteEvidence(evidence: DisciplineEvidence, at: number): void {
     const run = this.run;
+    const previousTop = this.activeCandidates().slice(0, 2).map((c) => c.hypothesisKey).sort().join("\u0000");
     this.noteFirstProductiveAction(at);
     if (evidence.selfCorrection) run.selfCorrectionObserved = true;
     for (const support of evidence.hypothesisSupport) {
@@ -149,6 +174,11 @@ export class RunRecorder {
       if (support.direction === "supports") run.supportCount[key] = (run.supportCount[key] ?? 0) + 1;
       if (!run.candidateOrder.includes(key)) run.candidateOrder.push(key);
     }
+    const currentTop = this.activeCandidates().slice(0, 2).map((c) => c.hypothesisKey).sort().join("\u0000");
+    if (previousTop !== currentTop) {
+      run.probeResolved = false;
+      run.discriminates = [];
+    }
   }
 
   noteArtifactVersion(id: string): void {
@@ -162,7 +192,7 @@ export class RunRecorder {
     const run = this.run;
     return run.candidateOrder
       .map((key) => ({ hypothesisKey: key, supporting: run.supportCount[key] ?? 0 }))
-      .sort((a, b) => b.supporting - a.supporting || run.candidateOrder.indexOf(a.hypothesisKey) - run.candidateOrder.indexOf(b.hypothesisKey));
+      .sort((a, b) => b.supporting - a.supporting || (a.hypothesisKey < b.hypothesisKey ? -1 : a.hypothesisKey > b.hypothesisKey ? 1 : 0)).slice(0, 3);
   }
 
   usedProbeIds(): readonly string[] { return [...this.run.usedProbeIds]; }
@@ -186,13 +216,15 @@ export class RunRecorder {
   }
 
   toJSON(): RunRecorderState {
-    return { sessionId: this.sessionId, learnerId: this.learnerId, runSeq: this.runSeq, run: this.facts };
+    return { sessionId: this.sessionId, learnerId: this.learnerId, runSeq: this.runSeq, run: structuredClone(this.facts) };
   }
 
   static from(state: RunRecorderState): RunRecorder {
     const recorder = new RunRecorder(state.sessionId, state.learnerId);
     recorder.runSeq = state.runSeq;
-    recorder.facts = state.run;
+    recorder.facts = structuredClone(state.run);
+    // 旧快照没有间隔事实，按尚无新产出恢复，不能借重启绕过预算。
+    if (recorder.facts) recorder.facts.newOutputSinceLastProbe ??= false;
     return recorder;
   }
 }

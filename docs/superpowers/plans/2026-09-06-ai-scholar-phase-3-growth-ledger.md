@@ -9,6 +9,14 @@
 
 **本计划不重复抄设计稿。** 每批只写：改哪些文件、依据设计稿哪一节、跑哪组测试、怎么验收。实现时对着设计稿写代码。
 
+## 2026-09-12 续执行状态
+
+批 1、2 的既有提交不变；批 3–7 的核心实现已落地并完成集成测试。实施与复核细节见 [阶段 3 实施记录](2026-09-12-ai-scholar-phase-3-implementation.md)。
+
+本次批 3–7 在同一工作分支连续实现，共享协议、账本服务和编排器改动，改为一次全绿后的集成提交，不把相互依赖的中间态拆成假装可独立运行的五次提交。以下复选框描述**实现步骤**；不代表设计稿 §13 的 206 项验收编号已全部逐项终审，也不代表真机验收通过。
+
+最终本地验证：2026-09-12 `pnpm test` **53 个文件、443 项通过**；`pnpm typecheck` 全工作区通过；Swift **27 单测 + 3 UI 通过**。独立代码复核发现的保留清理画布副本 P1 已修复并重新测试。阶段终验保持开放，见实施记录的未完成项。
+
 ## 全局纪律
 
 - 严格模式 TypeScript（`strict` + `exactOptionalPropertyTypes` + `noUncheckedIndexedAccess`）；可选字段 `?: T | undefined`；相对导入带 `.js`。
@@ -83,13 +91,13 @@
 
 **测试**：`growth/gate-rules.test.ts`（44–64）、`growth/gate-tier1.test.ts`（65–69）、`growth/candidate-source.test.ts`（104–108）、`growth/ledger-authority.test.ts`（109–115）、`session-state.test.ts` 改动（125–131）、`orchestrator.test.ts` 改动（132–152）、**`growth/tier2-happy-path.test.ts`（153–155，MF-02 守门测试）**、Swift（196–203）
 
-- [ ] Step 1：写 `gate-rules.test.ts` 与 `gate-tier1.test.ts`，确认红；实现规则表与三个入口
-- [ ] Step 2：写 `session-state.test.ts` 的四条新转换测试，确认红；改状态机
-- [ ] Step 3：写 `tier2-happy-path.test.ts`（用真 `mathPlugin` 跑完主路径并断言账本落一条档 2 记录），确认红
-- [ ] Step 4：实现 `ledger-service.ts` / `candidate.ts` / 编排器接入，跑到守门测试绿
-- [ ] Step 5：写 `ledger-authority.test.ts`（同时扫 `packages/` 与 `apps/`，除账本服务自身外任何文件 import 到 store 实现即失败）
-- [ ] Step 6：儿童端 Swift 同意界面与测试
-- [ ] Step 7：全绿并提交「实现三档门禁与档 2 写入闭环」
+- [x] Step 1：写 `gate-rules.test.ts` 与 `gate-tier1.test.ts`，确认红；实现规则表与三个入口
+- [x] Step 2：写 `session-state.test.ts` 的四条新转换测试，确认红；改状态机
+- [x] Step 3：写 `tier2-happy-path.test.ts`（用真 `mathPlugin` 跑完主路径并断言账本落一条档 2 记录），确认红
+- [x] Step 4：实现 `ledger-service.ts` / `candidate.ts` / 编排器接入，跑到守门测试绿
+- [x] Step 5：写 `ledger-authority.test.ts`（同时扫 `packages/` 与 `apps/`，除账本服务自身外任何文件 import 到 store 实现即失败）
+- [x] Step 6：儿童端 Swift 同意界面与测试
+- [x] Step 7：全绿并提交（本次统一纳入批 3–7 集成提交）
 
 ## 批 4：区分性探针
 
@@ -97,9 +105,9 @@
 
 **测试**：`growth/probe-selection.test.ts`（35–43）、`orchestrator` 探针相关（145、169）
 
-- [ ] Step 1：写 `probe-selection.test.ts`，确认红；实现 `separatesTwo` 与 `selectDiscriminatingProbe`
-- [ ] Step 2：状态机两条新转换 + 编排器发探针；探针不计升级次数、不推高最高提示级别、只受独立探针预算
-- [ ] Step 3：全绿并提交「实现区分性根因探针」
+- [x] Step 1：写 `probe-selection.test.ts`，确认红；实现 `separatesTwo` 与 `selectDiscriminatingProbe`
+- [x] Step 2：状态机两条新转换 + 编排器发探针；探针不计升级次数、不推高最高提示级别、只受独立探针预算
+- [x] Step 3：全绿并提交（本次统一纳入批 3–7 集成提交）
 
 ## 批 5：跨轮趋势与档 3
 
@@ -107,11 +115,11 @@
 
 **测试**：`growth/scaffold-trend.test.ts`（70–79）、`parent-channel.test.ts`（185–195）
 
-- [ ] Step 1：写 `scaffold-trend.test.ts`，确认红；实现趋势判定（分支顺序按 §6.2：gap 短路 → 点数不足 → rising 优先 → withdrawing → 持平才看前窗口）
-- [ ] Step 2：档 3 门禁与家长审阅接口；家长只有批准 / 拒绝 / 收窄范围，没有改写文案的入口
-- [ ] Step 3：通道分离，升级现有的本机限制为两个独立实例
-- [ ] Step 4：家长控制台两块界面
-- [ ] Step 5：全绿并提交「实现跨轮退出趋势与第 3 档写入」
+- [x] Step 1：写 `scaffold-trend.test.ts`，确认红；实现趋势判定（分支顺序按 §6.2：gap 短路 → 点数不足 → rising 优先 → withdrawing → 持平才看前窗口）
+- [x] Step 2：档 3 门禁与家长审阅接口；家长只有批准 / 拒绝 / 收窄范围，没有改写文案的入口
+- [x] Step 3：通道分离，升级现有的本机限制为两个独立实例
+- [x] Step 4：家长控制台两块界面
+- [x] Step 5：全绿并提交（本次统一纳入批 3–7 集成提交）
 
 ## 批 6：孩子的知情、异议与视图
 
@@ -119,11 +127,11 @@
 
 **测试**：`growth/views.test.ts`（116–124）、`child-channel.test.ts`（179–184）、Swift（204–205）
 
-- [ ] Step 1：写 `views.test.ts`，确认红；实现三视图投影，孩子视图含活动假设的儿童版描述与中性脚手架句
-- [ ] Step 2：`CONTEST.target` 类型化为 `{kind, id}`，儿童端按当前呈现内容填出可解析目标；编排器落 `contests` 与冻结集
-- [ ] Step 3：`/child/*` 通道与首次告知；会话已 `COMPLETED` 或宿主重启后无活动会话时三件事仍返回 200
-- [ ] Step 4：儿童端「系统目前怎么理解我」页面
-- [ ] Step 5：全绿并提交「实现孩子的知情、异议与三种视图」
+- [x] Step 1：写 `views.test.ts`，确认红；实现三视图投影，孩子视图含活动假设的儿童版描述与中性脚手架句
+- [x] Step 2：`CONTEST.target` 类型化为 `{kind, id}`，儿童端按当前呈现内容填出可解析目标；编排器落 `contests` 与冻结集
+- [x] Step 3：`/child/*` 通道与首次告知；会话已 `COMPLETED` 或宿主重启后无活动会话时三件事仍返回 200
+- [x] Step 4：儿童端「系统目前怎么理解我」页面
+- [x] Step 5：全绿并提交（本次统一纳入批 3–7 集成提交）
 
 ## 批 7：删除级联与保留清理
 
@@ -131,12 +139,12 @@
 
 **测试**：`growth/deletion.test.ts`（80–91）、`growth/deletion-request-flow.test.ts`（92–99）、`growth/retention.test.ts`（100–103）
 
-- [ ] Step 1：写 `deletion.test.ts`，确认红；实现 `planDeletionCascade`
-- [ ] Step 2：删除执行：单个 `BEGIN IMMEDIATE` 内完成，同时脱敏会话库四处 JSON 列；提交后 `wal_checkpoint(TRUNCATE)` + `VACUUM`
-- [ ] Step 3：金丝雀测试**先自检**删除前能扫到标记串，再断言删除后 0 命中（避免恒绿空测试）
-- [ ] Step 4：删除请求闭环：请求即停用，家长拒绝也不解除，7 天只告警不自动删
-- [ ] Step 5：保留清理作业与脱敏后的最小可解析形状
-- [ ] Step 6：全绿并提交「实现删除级联与保留清理」
+- [x] Step 1：写 `deletion.test.ts`，确认红；实现 `planDeletionCascade`
+- [x] Step 2：删除执行：单个 `BEGIN IMMEDIATE` 内完成，同时脱敏会话库四处 JSON 列；提交后 `wal_checkpoint(TRUNCATE)` + `VACUUM`
+- [x] Step 3：金丝雀测试**先自检**删除前能扫到标记串，再断言删除后 0 命中（避免恒绿空测试）
+- [x] Step 4：删除请求闭环：请求即停用，家长拒绝也不解除，7 天只告警不自动删
+- [x] Step 5：保留清理作业与脱敏后的最小可解析形状
+- [x] Step 6：全绿并提交（本次统一纳入批 3–7 集成提交）
 
 ---
 

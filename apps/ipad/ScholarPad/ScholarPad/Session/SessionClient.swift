@@ -40,6 +40,12 @@ final class SessionClient {
         UserDefaults.standard.set(resolved, forKey: "padSessionId")
         self.sessionId = resolved
         outbox = EventOutbox(sessionId: resolved, deviceId: UIDevice.current.identifierForVendor?.uuidString ?? "ipad")
+        if let data = UserDefaults.standard.data(forKey: "padMemoryPreview-\(resolved)"),
+           let preview = try? JSONDecoder().decode(MemoryPreview.self, from: data) {
+            view.memoryPreview = preview
+            view.memoryPreviewNonce = preview.previewNonce
+            view.memoryPreviewCandidateId = preview.candidateId
+        }
         session = URLSession(configuration: .default, delegate: events, delegateQueue: nil)
         events.onOpen = { [weak self] taskId in Task { @MainActor in self?.handleOpen(taskId: taskId) } }
         events.onClose = { [weak self] taskId, reason in Task { @MainActor in self?.handleClose(taskId: taskId, reason: reason) } }
@@ -48,6 +54,18 @@ final class SessionClient {
     // MARK: - 连接
 
     func connect() {
+        #if DEBUG
+        if let phase = ProcessInfo.processInfo.environment["SCHOLARPAD_TEST_PHASE"] {
+            SessionViewState.reduce(&view, .stateChanged(id: "test", state: phase, hintLevel: 0, presence: "waiting"))
+            return
+        }
+        if let json = ProcessInfo.processInfo.environment["SCHOLARPAD_TEST_PREVIEW"],
+           let message = try? JSONDecoder().decode(ChildOutbound.self, from: Data(json.utf8)) {
+            SessionViewState.reduce(&view, .stateChanged(id: "test", state: "MEMORY_PENDING", hintLevel: 0, presence: "waiting"))
+            SessionViewState.reduce(&view, message)
+            return
+        }
+        #endif
         wantConnected = true
         reconnectAttempt = 0
         open()
@@ -164,6 +182,12 @@ final class SessionClient {
             Task { for frame in replay { try? await self.transmit(frame) } }
         case .outbound(let message):
             SessionViewState.reduce(&view, message)
+            let key = "padMemoryPreview-\(sessionId)"
+            if let preview = view.memoryPreview, let data = try? JSONEncoder().encode(preview) {
+                UserDefaults.standard.set(data, forKey: key)
+            } else if view.memoryPreviewNonce == nil {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
         case .error:
             rejectedFrames += 1
         }

@@ -146,6 +146,19 @@ apps/agent-host/test/replay-cli.test.ts
 
 ---
 
+### 0.5 2026-09-12 实施复核补充
+
+批 3–7 的核心代码与集成验证见 [实施记录](../plans/2026-09-12-ai-scholar-phase-3-implementation.md)。本节对下文原始伪代码作以下明确补充，不把未验收部分描述为已完成：
+
+- `growth-gate-v2` 增加候选与证据来源一致性门禁；再问冷却适用于档 2、3，同意停泊期间不消费原卡 nonce。
+- 家长收窄后新范围和新句子只在候选里，旧记录退出活动模型；下一轮同范围独立迁移、孩子重新同意后才替换记录，避免提前显示未同意的新结论。
+- 唯一创建/确认入口不禁止合法降权与删除；§9.3 第 4 条及测试 113 已据此修正。其它旧评审汇总中“所有端口哈希不变”的措辞以修正版为准。
+- 删除按作品定位原始事件，对同会话派生出站、提案和快照采取保守清理，防止后续讲解复述早期内容。原始的其他作品事件不因此删除；受影响会话关闭旧写入和异步运行时。
+- 决策持久化当时的 run/link 引用，重同意替换记录后仍能清理历史文字；删除结果与儿童通知和级联在同一个事务中。保留清理同时清理到期提案的文字与画布副本。
+- 三个补充持久化字段组：`sessions.content_deleted`、`challenge_runs.plugin_policy_json`、`memory_decisions.source_link_ids_json/source_run_ids_json`。快照保存每条 speak/task 原始异议目标。审计 CHECK 扩充范围收窄/降级动作并保留旧行迁移。
+- Swift 知情说明从独立 HTTP 获取，未确认不允许预览同意卡；普通画布学习不被禁止。宿主原始作品目前仅有事件/版本元数据，PKDrawing 二进制上传恢复未实现，展示端明确说明。
+- 206 条设计测试逐项映射、真机与真实家庭教学效果终验仍未完成；重复区分验证目前复用固定表面情境。
+
 ## 1. 插件契约扩展（MF-30）
 
 门禁要「这条证据来自哪个探针」「表面情境键」「是否自我修正」「难度带顺序」「这句话怎么说人话」，这些只能由学科插件给（硬约束 6 禁止学科逻辑进内核）。契约按下面扩展，方向词汇统一 `supports` / `weakens`（不引入 `refutes`）。
@@ -1349,7 +1362,7 @@ export interface GrowthChildPort  { … }
 1. `GrowthLedgerService.open({ db, clock })` 是唯一构造入口（`private constructor` + 静态工厂），`#store` 私有字段持有 `GrowthStore`，`#commitRecord` 私有方法。
 2. `growth/store/growth-sqlite.ts` 与 `growth/database.ts` 不从包 `index.ts` 导出（导出清单快照测试）。
 3. 机械扫描 `packages/` 与 `apps/` 下全部 `.ts`：除 `growth/ledger-service.ts` 与 `growth/store/` 自身外，任何文件 import `growth-sqlite.js` 或 `GrowthSqliteStore` 即失败；除 `growth/database.ts` 外任何文件 import `node:sqlite` 即失败。
-4. 端口方法穷举：遍历 `GrowthReadPort` / `GrowthSessionPort` / `GrowthParentPort` / `GrowthChildPort` 上的所有方法，逐个调用后 **`growth_records` 全表内容哈希不变**（不是 `COUNT(*)` —— 那对 `narrowScope` 这类改写恒绿）。
+4. 端口方法穷举：只读方法调用后 `growth_records` 全表内容哈希不变；会话/家长/儿童的授权异议、收窄、降级、撤回和删除可以使记录退出活动模型，但不得新建或确认记录。仅 `GrowthAssentPort.recordAssent` 可在门禁通过后新建/确认。每个变更入口分别验证授权状态变化和禁止升级路径，不能将合法删除要求为哈希不变。
 5. 类型级：上述四个端口上不存在任何**返回 `MemoryCommitDecision` 的方法**（按返回类型判，不按名字前缀猜；`evaluateAssent` 返回的是 `{wouldCommit, draft}` 包装类型，不是它本身）；`GrowthAssentPort` 只有一个方法。
 
 数据库层再加 `written_by` / `decided_by` 的 CHECK 常量作为第六道（它挡不住拿到同一 db 句柄的人，所以只是补充，不是主要手段——保障 3 才是）。
@@ -2035,7 +2048,7 @@ POST /child/artifacts/:versionId/png            （可选：儿童端上传画�
 110. 机械扫描 `packages/` 与 `apps/` 全部 `.ts`：除 `growth/ledger-service.ts` 与 `growth/store/` 外无人 import store 实现。
 111. 机械扫描：除 `growth/database.ts` 外无人 import `node:sqlite`。
 112. `new GrowthLedgerService(...)` 的类型测试编译不过（private constructor）。
-113. **端口方法穷举**：遍历四个只读/会话/家长/儿童端口的所有方法，逐个调用后 `growth_records` **全表内容哈希**不变（覆盖 `narrowScope` 这类改写）。
+113. **端口方法穷举**：只读操作后记录全表哈希不变；异议、范围收窄、降级、撤回、删除只允许对应降权/失效变更，不得新建或确认记录。新建/确认唯一入口为真实孩子同意后的 `GrowthAssentPort`；拒绝路径不能修改记录。本条于 2026-09-12 修正与 §8.3/§7 的原有矛盾，完整逐方法测试编号映射尚待终审。
 114. 四个端口上不存在任何返回 `MemoryCommitDecision` 的方法（类型测试）；`GrowthAssentPort` 只有一个方法。
 115. `recordAssent` 幂等：同一 `(candidateId, previewNonce)` 只落一条决策。
 

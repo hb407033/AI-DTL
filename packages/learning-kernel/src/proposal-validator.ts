@@ -14,6 +14,7 @@ export interface ValidationInput {
   /** 孩子层与原始材料层的对象 id，Agent 不得删除或覆盖 */
   protectedObjectIds: string[];
   maxSpokenChars?: number | undefined;
+  probeResolved?: boolean | undefined;
 }
 
 export type ValidationResult = { accepted: true; liftsSoftBudget: boolean } | { accepted: false; reasons: string[] };
@@ -25,7 +26,7 @@ export function validateProposal(input: ValidationInput): ValidationResult {
   const reasons: string[] = [];
   let liftsSoftBudget = false;
 
-  if (context.frozenTargetIds.includes(proposal.proposalId)) reasons.push("proposal:frozen");
+  if (context.frozenTargets.some(target => target.kind === "proposal" && target.id === proposal.proposalId)) reasons.push("proposal:frozen");
 
   if (proposal.hintLevel > 0 && proposal.hintLevel !== context.hintLevel) {
     const verdict = evaluateEscalation(context, proposal.hintLevel, budget);
@@ -48,6 +49,9 @@ export function validateProposal(input: ValidationInput): ValidationResult {
   if (proposal.memoryCandidate) {
     if (context.assistedRound) reasons.push("memory:assistedRound");
     else if (context.state !== "TRANSFER") reasons.push("memory:notAfterTransfer");
+    const hypotheses = [...new Set(proposal.memoryCandidate.hypothesisKeys ?? [])];
+    if (hypotheses.some(key => !plugin.manifest.hypothesisCatalog.some(item => item.id === key))) reasons.push("memory:unknownHypothesis");
+    if (hypotheses.length === 1 && !input.probeResolved) reasons.push("memory:rootCauseNotDiscriminated");
   }
 
   return reasons.length === 0 ? { accepted: true, liftsSoftBudget } : { accepted: false, reasons };

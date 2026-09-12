@@ -28,7 +28,7 @@ const legal: Array<[SessionState, Signal, SessionState]> = [
   ["TRANSFER", { kind: "transferSucceeded", hasMemoryCandidate: true }, "MEMORY_PENDING"],
   ["TRANSFER", { kind: "transferSucceeded", hasMemoryCandidate: false }, "COMPLETED"],
   ["TRANSFER", { kind: "transferFailed" }, "SOFT_LANDING"],
-  ["MEMORY_PENDING", { kind: "memoryAssent", choice: "record" }, "COMPLETED"],
+  ["MEMORY_PENDING", { kind: "memoryAssent", choice: "record", localRulesPassed: true }, "COMPLETED"],
   ["MEMORY_PENDING", { kind: "memoryAssent", choice: "unsure" }, "COMPLETED"],
   ["MEMORY_PENDING", { kind: "memoryAssent", choice: "disagree" }, "CONTESTED"],
   ["SOFT_LANDING", { kind: "softLandingChoice", choice: "simpler" }, "PREPARING"],
@@ -94,10 +94,10 @@ describe("5.0 元规则：儿童控制权事件在任意活动状态必须被接
       expect(help.context.state).toBe("ASSESSING");
       expect(help.context.helpRequestedSinceLastHint).toBe(true);
 
-      const contest = transition(at(state), { kind: "contest", targetId: "p-9" });
+      const contest = transition(at(state), { kind: "contest", target: { kind: "proposal", id: "p-9" } });
       expect(contest.ok).toBe(true);
-      expect(contest.context.state).toBe(state);
-      expect(contest.context.frozenTargetIds).toEqual(["p-9"]);
+      expect(contest.context.state).toBe("CONTESTED");
+      expect(contest.context.frozenTargets).toEqual([{ kind: "proposal", id: "p-9" }]);
       expect(contest.actions).toEqual(["stopDiagnosticQuestions", "freezeTeaching", "askWhereDiffers"]);
     });
   }
@@ -129,6 +129,44 @@ describe("5.0 元规则：儿童控制权事件在任意活动状态必须被接
 });
 
 describe("未列出的转换默认拒绝并记录策略错误", () => {
+  test("探针原地发出且不消耗提示预算，回答计入实质产出", () => {
+    const before = at("ASSESSING");
+    const issued = transition(before, { kind: "probeIssued" });
+    expect(issued.ok).toBe(true);
+    expect(issued.context).toEqual(before);
+    expect(issued.actions).toEqual(["askDiscriminatingProbe"]);
+    const answer = transition(issued.context, { kind: "childOutput", isNewStrategy: true });
+    expect(answer.ok).toBe(true);
+    expect(answer.context.substantiveAttempts).toBe(1);
+    expect(answer.context.state).toBe("ASSESSING");
+    expect(transition(at("INDEPENDENT"), { kind: "probeIssued" }).ok).toBe(false);
+  });
+  test("记下来必须有本地规则通过，失败不产生提交动作", () => {
+    for (const localRulesPassed of [false, undefined]) {
+      const result = transition(at("MEMORY_PENDING"), { kind: "memoryAssent", choice: "record", localRulesPassed });
+      expect(result.ok).toBe(false);
+      expect(result.context.state).toBe("MEMORY_PENDING");
+      expect(result.actions).toEqual([]);
+      expect(result.context.policyErrors.at(-1)?.code).toBe("guardFailed");
+    }
+  });
+
+  test("暂存后内核收尾，不要求孩子改变自己的选择", () => {
+    const result = transition(at("MEMORY_PENDING"), { kind: "memoryHeld" });
+    expect(result.ok).toBe(true);
+    expect(result.context.state).toBe("COMPLETED");
+    expect(result.actions).toEqual(["keepCandidateTemporary"]);
+  });
+
+  test("暂停中的旧同意与重复收尾不得转换", () => {
+    expect(transition(at("PAUSED_CHILD"), { kind: "memoryAssent", choice: "record", localRulesPassed: true }).ok).toBe(false);
+    expect(transition(at("COMPLETED"), { kind: "memoryHeld" }).ok).toBe(false);
+  });
+
+  test("不确定与异议不依赖写入门禁通过", () => {
+    expect(transition(at("MEMORY_PENDING"), { kind: "memoryAssent", choice: "unsure", localRulesPassed: false }).context.state).toBe("COMPLETED");
+    expect(transition(at("MEMORY_PENDING"), { kind: "memoryAssent", choice: "disagree", localRulesPassed: false }).context.state).toBe("CONTESTED");
+  });
   test("COMPLETED 收到孩子产出被拒绝，状态不变", () => {
     const r = transition(at("COMPLETED"), { kind: "childOutput", isNewStrategy: true });
     expect(r.ok).toBe(false);

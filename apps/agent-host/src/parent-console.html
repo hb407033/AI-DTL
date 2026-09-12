@@ -12,10 +12,16 @@
   label { display: block; margin-top: .6rem; }
   input, textarea, select { width: 100%; box-sizing: border-box; padding: .4rem; }
   ul { padding-left: 1.2rem; }
+  section { border-top: 1px solid #ddd; padding: 1rem 0; }
+  table { border-collapse: collapse; width: 100%; margin: .5rem 0; }
+  th, td { text-align: left; border-bottom: 1px solid #eee; padding: .4rem; }
+  button { margin: .4rem .4rem .4rem 0; padding: .5rem; }
 </style>
 </head>
 <body>
 <h1>家长控制台</h1>
+<label>家长访问凭据（仅保留在本页内存）<input id="token" type="password" autocomplete="off" /></label>
+<button id="connect">连接</button><p id="connection"></p>
 <p>会话：<select id="sessions"></select></p>
 <p class="state" id="state">未连接</p>
 <p id="challenge"></p>
@@ -34,36 +40,109 @@
 </div>
 <h2>最近证据</h2>
 <ul id="evidence"></ul>
+<h2>待审阅成长记录</h2><div id="growthPending"></div>
+<h2>教学警报</h2><div id="growthAlerts"></div>
+<h2>删除请求</h2><div id="deletionRequests"></div>
+<h2>已提交记录</h2><div id="growthRecords"></div>
+<button id="export">导出家中学习档案</button>
+<p id="growthError" role="status"></p>
 <script>
   const $ = (id) => document.getElementById(id);
   let current = null;
+  let token = "";
+  async function api(url, options = {}) {
+    const res = await fetch(url, { ...options, headers: { "X-Parent-Token": token, "content-type": "application/json", ...options.headers } });
+    if (!res.ok) throw new Error((await res.json()).error || `请求失败 ${res.status}`);
+    return res.json();
+  }
+  const post = (url, body = {}) => api(url, { method: "POST", body: JSON.stringify(body) });
+  function text(parent, value) { const p = document.createElement("p"); p.textContent = value; parent.append(p); }
+  function button(parent, label, action, disabled = false) {
+    const b = document.createElement("button"); b.textContent = label; b.disabled = disabled;
+    b.onclick = async () => { try { await action(); $("growthError").textContent = "已处理"; await refreshGrowth(); } catch (e) { $("growthError").textContent = e.message; } };
+    parent.append(b);
+  }
+  async function refreshGrowth() {
+    const [pending, trends, alerts, requests, records] = await Promise.all(["/parent/growth/pending", "/parent/growth/trends", "/parent/growth/alerts", "/parent/deletion-requests", "/parent/growth/records"].map(url => api(url)));
+    for (const id of ["growthPending", "growthAlerts", "deletionRequests", "growthRecords"]) $(id).replaceChildren();
+    if (!pending.length) text($("growthPending"), "暂无待审阅记录");
+    pending.forEach(review => {
+      const c = review.candidate;
+      const box = document.createElement("section"); $("growthPending").append(box);
+      text(box, c.childFacingText); text(box, c.evidenceSummaryText || "");
+      text(box, `探针族：${c.scope.probeFamilyId} · 难度带：${c.scope.difficultyBandIndex}`);
+      const table = document.createElement("table");
+      const heading = table.insertRow();
+      for (const label of ["开始时间", "轮次 / 探针族", "难度", "最高提示 / 升级次数", "探针数 / 已解决", "迁移结果 / 提示", "辅助轮"]) { const th = document.createElement("th"); th.textContent = label; heading.append(th); }
+      review.runs.forEach(run => { const row = table.insertRow(); for (const value of [new Date(run.startedAt).toLocaleString(), `${run.runId} / ${run.probeFamilyId}`, `${run.difficultyBand} (${run.difficultyBandIndex})`, `${run.maxHintLevelUsed} / ${run.escalationCount}`, `${run.probesIssued} / ${run.probeResolved ? "是" : "否"}`, `${run.transferOutcome} / ${run.transferHintLevelUsed}${run.transferTainted ? "（受提示影响）" : ""}`, run.assistedRound ? "是" : "否"]) row.insertCell().textContent = String(value); });
+      box.append(table);
+      text(box, `趋势：${review.trend?.verdict ?? "暂无证据"}`);
+      review.hypotheses.forEach(h => text(box, `${h.parentFacingLabel} · ${h.status} · 支持题目 ${h.counts.supportingChallenges} · 反驳题目 ${h.counts.refutingChallenges} · 不同情境 ${h.counts.distinctSurfaceContexts} · 独立迁移 ${h.counts.independentTransferSuccesses} · 提示后成功 ${h.counts.hintedSuccesses}${h.stopsDrivingPersonalization ? " · 已冻结" : ""}`));
+      review.artifactLinks.forEach(link => {
+        const details = document.createElement("details"), summary = document.createElement("summary");
+        summary.textContent = `查看作品 ${link.artifactId} 的原始事件证据 JSON`; details.append(summary); box.append(details);
+        details.ontoggle = async () => { if (!details.open || details.childElementCount > 1) return; try {
+          const evidence = await api(link.href); text(details, evidence.previewReason);
+          const pre = document.createElement("pre"); pre.style.whiteSpace = "pre-wrap"; pre.style.overflowWrap = "anywhere"; pre.textContent = JSON.stringify(evidence, null, 2); details.append(pre);
+        } catch (e) { text(details, e.message); } };
+      });
+      const blocked = review.blocked.length > 0;
+      if (blocked) { box.style.background = "#eee"; box.style.color = "#666"; review.blocked.forEach(reason => text(box, reason)); }
+      const note = document.createElement("textarea"); note.placeholder = "只给家长自己看的备注"; box.append(note);
+      for (const [label, decision] of [["批准", "approved"], ["拒绝", "rejected"]]) button(box, label, () => post(`/parent/growth/candidates/${encodeURIComponent(c.candidateId)}/review`, { decision, parentNote: note.value }), blocked);
+    });
+    trends.forEach(t => { if (t.report.verdict === "rising") text($("growthAlerts"), "这一族题目最近三轮需要的提示级别在上升，建议先不加难度，看看这三轮的介入记录"); else if (t.report.verdict === "incomplete") text($("growthAlerts"), "作品删除后，这一族题目的趋势证据尚不完整。"); });
+    alerts.forEach(a => { text($("growthAlerts"), `${a.kind === "deletionSlaBreached" ? "删除申请已超过 7 天，请处理" : "教学记录需要关注"}：${a.subjectId}`); button($("growthAlerts"), "已读", () => post(`/parent/signals/${encodeURIComponent(a.signalId)}/ack`)); });
+    requests.sort((a, b) => a.requestedAt - b.requestedAt).forEach(r => {
+      const box = document.createElement("section"); $("deletionRequests").append(box);
+      text(box, `${r.subjectId} · ${r.status}${r.escalated ? " · 孩子第 2 次请求" : ""}`);
+      text(box, `影响 ${r.preview.removeArtifactVersionIds} 个作品版本、${r.preview.invalidatedRecordIds} 条记录、${r.preview.removeScaffoldPointIds} 个趋势观察点、${r.preview.evidenceRemovedLinkIds} 条证据关联。`);
+      if (r.status === "pending" && Date.now() - r.requestedAt > 7 * 24 * 60 * 60 * 1000) { box.style.borderLeft = "4px solid #b00"; text(box, "已超过 7 天，请优先处理。"); }
+      if (r.status === "pending") for (const [label, decision] of [["同意删除", "approved"], ["暂时保留", "rejected"]]) button(box, label, () => post(`/parent/deletion-requests/${encodeURIComponent(r.requestId)}/resolve`, { decision }));
+    });
+    records.forEach(r => {
+      const box = document.createElement("section"); $("growthRecords").append(box); text(box, `${r.childFacingText} · ${r.status}`);
+      const correctionBlocked = r.status === "contested" || r.tier === 3;
+      if (correctionBlocked) text(box, r.status === "contested" ? "孩子已提出异议，不能纠正这条记录。" : "跨轮趋势不能由家长直接纠正。");
+      const band = document.createElement("input"); band.type = "number"; band.min = "0"; band.placeholder = "收窄到难度带编号"; band.setAttribute("aria-label", "收窄到难度带编号"); box.append(band);
+      button(box, "收窄范围（会重新问孩子）", async () => { if (!band.value) throw new Error("请输入难度带编号"); await post(`/parent/growth/records/${encodeURIComponent(r.recordId)}/narrow-scope`, { toBandIndex: Number(band.value) }); }, correctionBlocked);
+      for (const [label, action] of [["降级", "downgrade"], ["撤回", "retract"]]) button(box, label, () => post(`/parent/growth/records/${encodeURIComponent(r.recordId)}/${action}`), correctionBlocked);
+      button(box, "预览删除", async () => {
+        const s = { subjectKind: "growth_record", subjectId: r.recordId };
+        const preview = await api(`/parent/deletion-preview?${new URLSearchParams(s)}`);
+        if (confirm(preview.text)) await post("/parent/deletion", { ...s, previewComputedAt: preview.previewComputedAt });
+      });
+    });
+  }
   async function refreshSessions() {
-    const { sessions } = await (await fetch("/parent/sessions")).json();
+    const { sessions } = await api("/parent/sessions");
     const select = $("sessions");
     const before = select.value;
-    select.innerHTML = sessions.map((s) => `<option>${s}</option>`).join("");
+    select.replaceChildren(...sessions.map(s => { const option = document.createElement("option"); option.value = s; option.textContent = s; return option; }));
     if (sessions.includes(before)) select.value = before;
     current = select.value || null;
   }
   async function refresh() {
     if (!current) return;
-    const view = await (await fetch(`/parent/sessions/${encodeURIComponent(current)}`)).json();
+    const view = await api(`/parent/sessions/${encodeURIComponent(current)}`);
     $("state").textContent = `${view.state} · 提示级别 ${view.hintLevel}${view.assistedRound ? " · 辅助轮" : ""}`;
     $("challenge").textContent = view.challengePrompt;
     $("pending").hidden = !view.pending;
     if (view.pending) { $("purpose").textContent = view.pending.purpose; $("maxLevel").textContent = view.pending.allowedMaxHintLevel; }
-    $("evidence").innerHTML = view.recentEvidence.map((e) => `<li>${e.kind}：${e.summary}</li>`).join("");
+    $("evidence").replaceChildren(...view.recentEvidence.map(e => { const li = document.createElement("li"); li.textContent = `${e.kind}：${e.summary}`; return li; }));
   }
   $("submit").onclick = async () => {
     const body = { spokenResponse: $("spoken").value, learnerTask: $("task").value, hintLevel: Number($("level").value) };
-    const res = await fetch(`/parent/sessions/${encodeURIComponent(current)}/proposal`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const res = await fetch(`/parent/sessions/${encodeURIComponent(current)}/proposal`, { method: "POST", headers: { "content-type": "application/json", "X-Parent-Token": token }, body: JSON.stringify(body) });
     $("error").textContent = res.ok ? "" : (await res.json()).error;
     if (res.ok) { $("spoken").value = ""; $("task").value = ""; }
     refresh();
   };
   $("sessions").onchange = () => { current = $("sessions").value; refresh(); };
-  setInterval(async () => { await refreshSessions(); await refresh(); }, 1000);
-  refreshSessions().then(refresh);
+  async function poll() { if (!token) return; try { await refreshSessions(); await refresh(); $("connection").textContent = "已连接"; } catch (e) { $("connection").textContent = e.message; } }
+  $("connect").onclick = async () => { token = $("token").value; $("token").value = ""; await poll(); try { await refreshGrowth(); } catch (e) { $("growthError").textContent = e.message; } };
+  $("export").onclick = async () => { try { const archive = await api("/parent/export"); const url = URL.createObjectURL(new Blob([JSON.stringify(archive, null, 2)], { type: "application/json" })); const link = document.createElement("a"); link.href = url; link.download = "learning-archive.json"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); } catch (e) { $("growthError").textContent = e.message; } };
+  setInterval(poll, 1000);
 </script>
 </body>
 </html>

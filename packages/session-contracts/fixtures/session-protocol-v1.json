@@ -11,11 +11,11 @@
     { "eventId": "e-8", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 8, "occurredAt": 1757200007000, "quality": "confirmed", "source": "child_button", "payload": { "type": "HELP_REQUEST" } },
     { "eventId": "e-9", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 9, "occurredAt": 1757200008000, "quality": "confirmed", "source": "child_button", "payload": { "type": "PAUSE_REQUEST", "by": "child" } },
     { "eventId": "e-10", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 10, "occurredAt": 1757200009000, "quality": "confirmed", "source": "child_button", "payload": { "type": "RESUME_REQUEST" } },
-    { "eventId": "e-11", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 11, "occurredAt": 1757200010000, "quality": "confirmed", "source": "child_button", "payload": { "type": "CONTEST", "targetId": "p-3" } },
+    { "eventId": "e-11", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 11, "occurredAt": 1757200010000, "quality": "confirmed", "source": "child_button", "payload": { "type": "CONTEST", "target": { "kind": "proposal", "id": "p-3" } } },
     { "eventId": "e-12", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 12, "occurredAt": 1757200011000, "quality": "confirmed", "source": "child_button", "payload": { "type": "DONE" } },
     { "eventId": "e-13", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 13, "occurredAt": 1757200012000, "quality": "confirmed", "source": "child_button", "payload": { "type": "CONFIRM_TRANSCRIPT", "targetEventId": "e-1", "confirmed": true } },
     { "eventId": "e-14", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 14, "occurredAt": 1757200013000, "quality": "confirmed", "source": "child_button", "payload": { "type": "SOFT_LANDING_CHOICE", "choice": "simpler" } },
-    { "eventId": "e-15", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 15, "occurredAt": 1757200014000, "quality": "confirmed", "source": "child_button", "payload": { "type": "MEMORY_ASSENT", "choice": "unsure" } }
+    { "eventId": "e-15", "clientSessionId": "s-1", "deviceId": "ipad-1", "clientSeq": 15, "occurredAt": 1757200014000, "quality": "confirmed", "source": "child_button", "payload": { "type": "MEMORY_ASSENT", "candidateId": "candidate-1", "previewNonce": "pv-s-1-1", "choice": "unsure" } }
   ],
   "proposals": [
     { "proposalId": "p-1", "spokenResponse": "你现在已经确定了什么？", "learnerTask": "说说你确定的部分", "hintLevel": 1 },

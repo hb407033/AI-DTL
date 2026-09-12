@@ -19,6 +19,15 @@ struct SessionViewState: Equatable {
     var pendingConfirmation: Confirmation?
     var softLanding: SoftLanding?
     var notice: String?
+    var memoryPreview: MemoryPreview?
+    var memoryPreviewNonce: String?
+    var memoryPreviewCandidateId: String?
+    var spokenContestTarget: ContestTarget?
+    var taskContestTarget: ContestTarget?
+
+    func contestTarget(sessionId: String) -> ContestTarget {
+        memoryPreview?.contestTarget ?? spokenContestTarget ?? taskContestTarget ?? ContestTarget(kind: .session, id: sessionId)
+    }
 
     /// 重连或重开 App 前调用：Agent 层与弹层由宿主随后下发的“当前画面”重建，任务与最近一句先留着免得闪空
     mutating func resetForResume() {
@@ -27,6 +36,7 @@ struct SessionViewState: Equatable {
         pointer = nil
         softLanding = nil
         pendingConfirmation = nil
+        memoryPreview = nil
     }
 
     var isPaused: Bool { phase == "PAUSED_CHILD" || phase == "PAUSED_TECH" }
@@ -39,10 +49,30 @@ struct SessionViewState: Equatable {
             state.presence = Presence(rawValue: presence) ?? .listening
             if phase != "SOFT_LANDING" { state.softLanding = nil }
             if phase != "WAITING_CONFIRMATION" { state.pendingConfirmation = nil }
-        case .learnerTask(_, let text):
+            if !["MEMORY_PENDING", "WAITING_CONFIRMATION", "PAUSED_CHILD", "PAUSED_TECH"].contains(phase) {
+                state.memoryPreview = nil
+                state.memoryPreviewNonce = nil
+                state.memoryPreviewCandidateId = nil
+            }
+        case .memoryPreview(let preview):
+            // 重放只恢复同一张卡，不堆叠，也不重复触发选择。
+            if state.memoryPreview?.previewNonce != preview.previewNonce {
+                state.memoryPreview = preview
+                state.memoryPreviewNonce = preview.previewNonce
+                state.memoryPreviewCandidateId = preview.candidateId
+            }
+        case .memoryDismissed(_, let candidateId, _):
+            if state.memoryPreviewCandidateId == candidateId {
+                state.memoryPreview = nil
+                state.memoryPreviewNonce = nil
+                state.memoryPreviewCandidateId = nil
+            }
+        case .learnerTask(_, let text, let contestTarget):
             state.taskText = text
-        case .speak(_, let text, _, _):
+            state.taskContestTarget = contestTarget
+        case .speak(_, let text, _, _, let contestTarget):
             state.agentLine = text
+            state.spokenContestTarget = contestTarget
             state.speakVersion += 1
         case .canvasAction(_, let action):
             apply(action, to: &state)

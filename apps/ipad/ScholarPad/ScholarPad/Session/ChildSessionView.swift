@@ -10,6 +10,10 @@ struct ChildSessionView: View {
     @State private var clearToken = 0
     @State private var breathing = false
     @State private var showNotice = false
+    @State private var showUnderstanding = false
+    @State private var firstUseNotice: ChildFirstUseNotice?
+    @State private var firstUseError: String?
+    @State private var noticeBusy = false
 
     private enum DraftKind: String, CaseIterable, Identifiable {
         case thought = "想法"
@@ -20,6 +24,17 @@ struct ChildSessionView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            if let notice = firstUseNotice, !notice.acknowledged {
+                ScrollView {
+                    FirstUseNoticeView(notice: notice, isBusy: noticeBusy, acknowledge: acknowledgeFirstUse)
+                }.frame(maxHeight: 220)
+            }
+            if let firstUseError {
+                HStack {
+                    Text(firstUseError).font(.caption)
+                    Button("重试说明") { Task { await loadFirstUse() } }
+                }.padding(.horizontal)
+            }
             Divider()
             ZStack {
                 ChildCanvasView(clearToken: clearToken) { events in
@@ -27,6 +42,9 @@ struct ChildSessionView: View {
                     for event in events { client.send(event, source: .childTouch) }
                 }
                 AgentLayerView(objects: client.view.agentObjects, highlightedIds: client.view.highlightedIds, pointer: client.view.pointer)
+                if let preview = client.view.memoryPreview, !client.view.isPaused, firstUseNotice?.acknowledged == true {
+                    MemoryPreviewCard(preview: preview, act: act)
+                }
                 if client.view.isPaused { pauseOverlay }
                 if let landing = client.view.softLanding { softLandingOverlay(landing) }
                 if client.view.isCompleted { completedOverlay }
@@ -39,6 +57,11 @@ struct ChildSessionView: View {
         }
         .background(Color(.systemBackground))
         .onAppear { client.connect(); breathing = true }
+        .task(id: client.host) { await loadFirstUse() }
+        .sheet(isPresented: $showUnderstanding) {
+            if let ledger = ledgerClient { ChildUnderstandingView(client: ledger) }
+            else { Text("主机地址暂时不可用，请返回后重试。").padding() }
+        }
         .onChange(of: client.view.speakVersion) { _, _ in voice.speak(client.view.agentLine) }
         .onChange(of: client.view.notice) { _, notice in
             guard notice != nil else { return }
@@ -72,6 +95,8 @@ struct ChildSessionView: View {
                 .lineLimit(2)
                 .accessibilityIdentifier("taskText")
             Spacer()
+            Button("系统怎么理解我") { showUnderstanding = true }
+                .accessibilityIdentifier("openChildUnderstanding")
             Button("清空笔迹", role: .destructive) { clearToken += 1 }
                 .font(.caption)
             Button("换一题") { clearToken += 1; client.startNewSession() }
@@ -124,7 +149,7 @@ struct ChildSessionView: View {
             Button("我卡住了") { act(.helpRequest) }
             Button("我做完了") { act(.done) }
             Button(client.view.isPaused ? "继续" : "我想休息") { act(client.view.isPaused ? .resumeRequest : .pauseRequest(by: "child")) }
-            Button("你理解错了") { act(.contest(targetId: nil)) }
+            Button("你理解错了") { act(.contest(target: client.view.contestTarget(sessionId: client.sessionId))) }
         }
         .buttonStyle(.bordered)
         .font(.title3)
@@ -206,6 +231,39 @@ struct ChildSessionView: View {
 
     /// 孩子一动，Agent 就闭嘴（设计稿 8.2）
     private func childActed() { voice.interrupt() }
+
+    private var ledgerClient: ChildLedgerClient? {
+        guard let url = URL(string: "ws://\(client.host):8788/session") else { return nil }
+        return try? ChildLedgerClient(webSocketURL: url)
+    }
+
+    @MainActor private func loadFirstUse() async {
+        #if DEBUG
+        if let json = ProcessInfo.processInfo.environment["SCHOLARPAD_TEST_FIRST_USE_NOTICE"],
+           let notice = try? JSONDecoder().decode(ChildFirstUseNotice.self, from: Data(json.utf8)) {
+            firstUseNotice = notice
+            return
+        }
+        #endif
+        guard let ledger = ledgerClient else { firstUseError = "学习说明暂时读不到，仍然可以在画布上学习。"; return }
+        noticeBusy = true
+        defer { noticeBusy = false }
+        do { firstUseNotice = try await ledger.firstUseNotice(); firstUseError = nil }
+        catch { firstUseError = "学习说明未读取成功：\(error.localizedDescription)" }
+    }
+
+    private func acknowledgeFirstUse() {
+        guard let notice = firstUseNotice, !notice.acknowledged, let ledger = ledgerClient else { return }
+        noticeBusy = true
+        Task {
+            defer { noticeBusy = false }
+            do {
+                try await ledger.acknowledgeNotice(version: notice.version)
+                firstUseNotice = ChildFirstUseNotice(version: notice.version, text: notice.text, acknowledged: true)
+                firstUseError = nil
+            } catch { firstUseError = "没有确认成功，请再试一次：\(error.localizedDescription)" }
+        }
+    }
 
     private static func softLandingTitle(_ option: String) -> String {
         switch option {

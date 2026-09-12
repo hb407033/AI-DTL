@@ -2,7 +2,7 @@
   "name": "@ai-scholar/learning-kernel",
   "private": true,
   "type": "module",
-  "exports": "./src/index.ts",
+  "exports": { ".": "./src/index.ts", "./database": "./src/growth/database.ts" },
   "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
   "dependencies": { "@ai-scholar/session-contracts": "workspace:*", "zod": "^4.5.4" }
 }

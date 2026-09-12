@@ -44,11 +44,11 @@ enum EventPayload: Equatable {
     case helpRequest
     case pauseRequest(by: String)
     case resumeRequest
-    case contest(targetId: String?)
+    case contest(target: ContestTarget)
     case done
     case confirmTranscript(targetEventId: String, confirmed: Bool, correctedText: String?)
     case softLandingChoice(choice: String)
-    case memoryAssent(choice: String)
+    case memoryAssent(candidateId: String, previewNonce: String, choice: MemoryAssentChoice)
 
     var type: String {
         switch self {
@@ -73,7 +73,7 @@ enum EventPayload: Equatable {
 
 extension EventPayload: Codable {
     private enum Keys: String, CodingKey {
-        case type, text, strokeId, contentHash, bounds, objectId, to, by, targetId, targetEventId, confirmed, correctedText, choice
+        case type, text, strokeId, contentHash, bounds, objectId, to, by, target, targetEventId, confirmed, correctedText, choice, candidateId, previewNonce
     }
 
     init(from decoder: Decoder) throws {
@@ -89,11 +89,11 @@ extension EventPayload: Codable {
         case "HELP_REQUEST": self = .helpRequest
         case "PAUSE_REQUEST": self = .pauseRequest(by: try c.decode(String.self, forKey: .by))
         case "RESUME_REQUEST": self = .resumeRequest
-        case "CONTEST": self = .contest(targetId: try c.decodeIfPresent(String.self, forKey: .targetId))
+        case "CONTEST": self = .contest(target: try c.decode(ContestTarget.self, forKey: .target))
         case "DONE": self = .done
         case "CONFIRM_TRANSCRIPT": self = .confirmTranscript(targetEventId: try c.decode(String.self, forKey: .targetEventId), confirmed: try c.decode(Bool.self, forKey: .confirmed), correctedText: try c.decodeIfPresent(String.self, forKey: .correctedText))
         case "SOFT_LANDING_CHOICE": self = .softLandingChoice(choice: try c.decode(String.self, forKey: .choice))
-        case "MEMORY_ASSENT": self = .memoryAssent(choice: try c.decode(String.self, forKey: .choice))
+        case "MEMORY_ASSENT": self = .memoryAssent(candidateId: try c.decode(String.self, forKey: .candidateId), previewNonce: try c.decode(String.self, forKey: .previewNonce), choice: try c.decode(MemoryAssentChoice.self, forKey: .choice))
         case let other: throw DecodingError.dataCorruptedError(forKey: .type, in: c, debugDescription: "未知事件类型：\(other)")
         }
     }
@@ -118,13 +118,17 @@ extension EventPayload: Codable {
             try c.encode(contentHash, forKey: .contentHash)
         case .pauseRequest(let by):
             try c.encode(by, forKey: .by)
-        case .contest(let targetId):
-            try c.encodeIfPresent(targetId, forKey: .targetId)
+        case .contest(let target):
+            try c.encode(target, forKey: .target)
         case .confirmTranscript(let targetEventId, let confirmed, let correctedText):
             try c.encode(targetEventId, forKey: .targetEventId)
             try c.encode(confirmed, forKey: .confirmed)
             try c.encodeIfPresent(correctedText, forKey: .correctedText)
-        case .softLandingChoice(let choice), .memoryAssent(let choice):
+        case .memoryAssent(let candidateId, let previewNonce, let choice):
+            try c.encode(candidateId, forKey: .candidateId)
+            try c.encode(previewNonce, forKey: .previewNonce)
+            try c.encode(choice, forKey: .choice)
+        case .softLandingChoice(let choice):
             try c.encode(choice, forKey: .choice)
         case .helpRequest, .resumeRequest, .done:
             break
@@ -304,9 +308,11 @@ extension CanvasAction: Codable {
 
 /// 儿童端能看到的全部输出：没有聊天历史、JSON、模型内部信息（设计稿 8.1）。
 enum ChildOutbound: Equatable {
-    case speak(id: String, text: String, hintLevel: Int, interruptible: Bool)
+    case memoryPreview(MemoryPreview)
+    case memoryDismissed(id: String, candidateId: String, reason: MemoryDismissReason)
+    case speak(id: String, text: String, hintLevel: Int, interruptible: Bool, contestTarget: ContestTarget? = nil)
     case canvasAction(id: String, action: CanvasAction)
-    case learnerTask(id: String, text: String)
+    case learnerTask(id: String, text: String, contestTarget: ContestTarget? = nil)
     case stateChanged(id: String, state: String, hintLevel: Int, presence: String)
     case confirmTranscript(id: String, targetEventId: String, text: String)
     case softLanding(id: String, message: String, options: [String])
@@ -314,15 +320,17 @@ enum ChildOutbound: Equatable {
 }
 
 extension ChildOutbound: Decodable {
-    private enum Keys: String, CodingKey { case type, id, text, hintLevel, interruptible, action, state, presence, targetEventId, message, options }
+    private enum Keys: String, CodingKey { case type, id, text, hintLevel, interruptible, action, state, presence, targetEventId, message, options, candidateId, reason, contestTarget }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
         let id = try c.decode(String.self, forKey: .id)
         switch try c.decode(String.self, forKey: .type) {
-        case "speak": self = .speak(id: id, text: try c.decode(String.self, forKey: .text), hintLevel: try c.decode(Int.self, forKey: .hintLevel), interruptible: try c.decode(Bool.self, forKey: .interruptible))
+        case "memoryPreview": self = .memoryPreview(try MemoryPreview(from: decoder))
+        case "memoryDismissed": self = .memoryDismissed(id: id, candidateId: try c.decode(String.self, forKey: .candidateId), reason: try c.decode(MemoryDismissReason.self, forKey: .reason))
+        case "speak": self = .speak(id: id, text: try c.decode(String.self, forKey: .text), hintLevel: try c.decode(Int.self, forKey: .hintLevel), interruptible: try c.decode(Bool.self, forKey: .interruptible), contestTarget: try c.decodeIfPresent(ContestTarget.self, forKey: .contestTarget))
         case "canvasAction": self = .canvasAction(id: id, action: try c.decode(CanvasAction.self, forKey: .action))
-        case "learnerTask": self = .learnerTask(id: id, text: try c.decode(String.self, forKey: .text))
+        case "learnerTask": self = .learnerTask(id: id, text: try c.decode(String.self, forKey: .text), contestTarget: try c.decodeIfPresent(ContestTarget.self, forKey: .contestTarget))
         case "stateChanged": self = .stateChanged(id: id, state: try c.decode(String.self, forKey: .state), hintLevel: try c.decode(Int.self, forKey: .hintLevel), presence: try c.decode(String.self, forKey: .presence))
         case "confirmTranscript": self = .confirmTranscript(id: id, targetEventId: try c.decode(String.self, forKey: .targetEventId), text: try c.decode(String.self, forKey: .text))
         case "softLanding": self = .softLanding(id: id, message: try c.decode(String.self, forKey: .message), options: try c.decode([String].self, forKey: .options))

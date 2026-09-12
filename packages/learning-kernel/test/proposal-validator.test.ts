@@ -42,7 +42,7 @@ describe("教学提案本地校验（设计稿 10.3、13）", () => {
     expect(validateProposal(input(proposal({ hintLevel: 0, memoryCandidate: { description: "会了", evidenceEventIds: ["e-1"] } }), assisted))).toEqual({ accepted: false, reasons: ["memory:assistedRound"] });
   });
   test("被异议冻结的提案 id 不能再次提出", () => {
-    const r = validateProposal(input(proposal(), { ...ctx(), frozenTargetIds: ["p-1"] }));
+    const r = validateProposal(input(proposal(), { ...ctx(), frozenTargets: [{ kind: "proposal", id: "p-1" }] }));
     expect(r).toEqual({ accepted: false, reasons: ["proposal:frozen"] });
   });
   test("0 级提案（非提示发言）不做升级裁定", () => {

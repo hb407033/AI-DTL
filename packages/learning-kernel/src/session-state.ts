@@ -3,6 +3,7 @@
 // 元规则：教学转换未列出即拒绝并记策略错误；儿童控制权事件（求助/暂停/异议）在任何活动状态都必须被接受。
 // 本文件只做状态与上下文的纯函数转换，不碰时钟、桥接和存储，便于把整张表当数据逐行测试。
 
+import type { ContestTarget } from "./growth/types.js";
 export const SESSION_STATES = [
   "PREPARING", "INDEPENDENT", "ASSESSING", "INTERVENING", "RECONSTRUCT", "EXPLAIN_BACK", "TRANSFER",
   "MEMORY_PENDING", "COMPLETED", "SOFT_LANDING", "WAITING_PARENT", "WAITING_CONFIRMATION",
@@ -24,7 +25,7 @@ export type Signal =
   | { kind: "helpRequest" }
   | { kind: "pauseRequest" }
   | { kind: "resume" }
-  | { kind: "contest"; targetId?: string | undefined }
+  | { kind: "contest"; target: ContestTarget }
   | { kind: "windowExpired" }
   | { kind: "hardCapReached" }
   | { kind: "assessedRecoverable" }
@@ -40,7 +41,9 @@ export type Signal =
   | { kind: "explainBackRevealedGap" }
   | { kind: "transferSucceeded"; hasMemoryCandidate: boolean }
   | { kind: "transferFailed" }
-  | { kind: "memoryAssent"; choice: "record" | "unsure" | "disagree" }
+  | { kind: "memoryAssent"; choice: "record" | "unsure" | "disagree"; localRulesPassed?: boolean | undefined }
+  | { kind: "memoryHeld" }
+  | { kind: "probeIssued" }
   | { kind: "softLandingChoice"; choice: "simpler" | "hint" | "stop" }
   | { kind: "transcriptUncertain" }
   | { kind: "transcriptConfirmed" }
@@ -58,7 +61,7 @@ export type KernelAction =
   | "markAssistedHint" | "saveTempHypotheses" | "revalidateChallenge" | "holdUnconfirmedEvent" | "writeConfirmation"
   | "keepUnconfirmed" | "stopTimers" | "resumeFromCheckpoint" | "restartFromSnapshot" | "restoreContextNoHint"
   | "planDiscriminatingTask" | "stopDiagnosticQuestions" | "askWhereDiffers" | "clearAssisted" | "noInterventionEvidence"
-  | "presenceOnly" | "checkUnderstanding";
+  | "presenceOnly" | "checkUnderstanding" | "askDiscriminatingProbe";
 
 export interface PolicyError {
   code: "unlistedTransition" | "guardFailed";
@@ -82,7 +85,7 @@ export interface SessionContext {
   /** 孩子侧实质性尝试次数；4 级演示前必须 ≥ 1 */
   substantiveAttempts: number;
   /** 被异议冻结的提案或假设 id */
-  frozenTargetIds: string[];
+  frozenTargets: readonly ContestTarget[];
   policyErrors: PolicyError[];
 }
 
@@ -90,7 +93,7 @@ export function createSessionContext(): SessionContext {
   return {
     state: "PREPARING", priorState: null, hintLevel: 0, maxHintLevelUsed: 0, escalationCount: 0,
     assistedRound: false, independentSuccess: true, newOutputSinceLastHint: true, helpRequestedSinceLastHint: false,
-    substantiveAttempts: 0, frozenTargetIds: [], policyErrors: [],
+    substantiveAttempts: 0, frozenTargets: [], policyErrors: [],
   };
 }
 
@@ -123,6 +126,8 @@ const RULES: Rule[] = [
   { from: "INDEPENDENT", signal: "hardCapReached", to: "ASSESSING", actions: ["summarizeEvidence"] },
   { from: "INDEPENDENT", signal: "childDone", to: "EXPLAIN_BACK", actions: ["noInterventionEvidence", "requestExplainBack"] },
   { from: "ASSESSING", signal: "helpRequest", to: "SAME", actions: ["summarizeEvidence"], update: () => ({ helpRequestedSinceLastHint: true }) },
+  { from: "ASSESSING", signal: "probeIssued", to: "SAME", actions: ["askDiscriminatingProbe"] },
+  { from: "ASSESSING", signal: "childOutput", to: "SAME", actions: [], update: (ctx, s) => s.kind === "childOutput" && s.isNewStrategy ? childOutputUpdate(ctx) : {} },
   { from: "ASSESSING", signal: "assessedRecoverable", to: "INTERVENING", actions: ["authorizeNextHint"] },
   { from: "ASSESSING", signal: "assessedIndependentSolution", to: "EXPLAIN_BACK", actions: ["requestExplainBack"] },
   { from: "ASSESSING", signal: "assessedBudgetExhausted", to: "SOFT_LANDING", actions: ["enterAssistance"], update: () => ({ assistedRound: true }) },
@@ -144,10 +149,11 @@ const RULES: Rule[] = [
   { from: "TRANSFER", signal: "childOutput", to: "SAME", actions: [], update: (ctx) => childOutputUpdate(ctx) },
   { from: "TRANSFER", signal: "transferSucceeded", to: (s) => (s.kind === "transferSucceeded" && s.hasMemoryCandidate ? "MEMORY_PENDING" : "COMPLETED"), actions: (s) => (s.kind === "transferSucceeded" && s.hasMemoryCandidate ? ["previewMemory"] : ["saveArtifactOnly"]) },
   { from: "TRANSFER", signal: "transferFailed", to: "SOFT_LANDING", actions: ["enterAssistance"], update: () => ({ assistedRound: true }) },
-  { from: "MEMORY_PENDING", signal: "memoryAssent", to: (s) => (s.kind === "memoryAssent" && s.choice === "disagree" ? "CONTESTED" : "COMPLETED"), actions: (s) => {
+  { from: "MEMORY_PENDING", signal: "memoryAssent", guard: (_ctx, s) => s.kind === "memoryAssent" && (s.choice !== "record" || s.localRulesPassed === true), to: (s) => (s.kind === "memoryAssent" && s.choice === "disagree" ? "CONTESTED" : "COMPLETED"), actions: (s) => {
       if (s.kind !== "memoryAssent") return [];
       return s.choice === "record" ? ["commitGrowthRecord"] : s.choice === "unsure" ? ["keepCandidateTemporary"] : ["freezeAndPlanVerification"];
     } },
+  { from: "MEMORY_PENDING", signal: "memoryHeld", to: "COMPLETED", actions: ["keepCandidateTemporary"] },
   { from: "SOFT_LANDING", signal: "softLandingChoice", to: (s) => (s.kind !== "softLandingChoice" ? "SAME" : s.choice === "simpler" ? "PREPARING" : s.choice === "hint" ? "INTERVENING" : "COMPLETED"), actions: (s) => (s.kind !== "softLandingChoice" ? [] : s.choice === "simpler" ? ["revalidateChallenge"] : s.choice === "hint" ? ["markAssistedHint"] : ["saveTempHypotheses"]), update: () => ({ assistedRound: true }) },
   { from: "WAITING_PARENT", signal: "parentConfirmedMaterial", to: "PREPARING", actions: ["revalidateChallenge"] },
   { from: "WAITING_CONFIRMATION", signal: "transcriptConfirmed", to: "PRIOR", actions: ["writeConfirmation"] },
@@ -160,7 +166,7 @@ const RULES: Rule[] = [
   // 儿童控制权与中断类通配行
   { from: "ANY_ACTIVE", signal: "pauseRequest", to: "PAUSED_CHILD", actions: ["createCheckpoint"] },
   { from: "ANY_ACTIVE", signal: "helpRequest", to: "ASSESSING", actions: ["summarizeEvidence"], update: () => ({ helpRequestedSinceLastHint: true }) },
-  { from: "ANY_ACTIVE", signal: "contest", to: "SAME", actions: ["stopDiagnosticQuestions", "freezeTeaching", "askWhereDiffers"], update: (ctx, s) => ({ frozenTargetIds: s.kind === "contest" && s.targetId && !ctx.frozenTargetIds.includes(s.targetId) ? [...ctx.frozenTargetIds, s.targetId] : ctx.frozenTargetIds }) },
+  { from: "ANY_ACTIVE", signal: "contest", to: "CONTESTED", actions: ["stopDiagnosticQuestions", "freezeTeaching", "askWhereDiffers"], update: (ctx, s) => ({ frozenTargets: s.kind === "contest" && !ctx.frozenTargets.some(target => target.kind === s.target.kind && target.id === s.target.id) ? [...ctx.frozenTargets, s.target] : ctx.frozenTargets }) },
   { from: "ANY_ACTIVE", signal: "transcriptUncertain", to: "WAITING_CONFIRMATION", actions: ["holdUnconfirmedEvent"] },
   { from: "ANY_ACTIVE", signal: "techInterrupted", to: "PAUSED_TECH", actions: ["createCheckpoint", "stopTimers"] },
 ];

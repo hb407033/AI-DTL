@@ -7,6 +7,8 @@ export type LearningDatabase = DatabaseSync;
 
 /** 会话侧新增的列：旧库用 ALTER 补，新库由 CREATE TABLE 直接带上 */
 const SESSION_COLUMNS: ReadonlyArray<readonly [table: string, column: string, ddl: string]> = [
+  ["sessions", "content_deleted", "INTEGER NOT NULL DEFAULT 0"],
+  ["outbound", "redacted", "INTEGER NOT NULL DEFAULT 0"],
   ["events", "artifact_version_id", "TEXT"],
   ["events", "redacted", "INTEGER NOT NULL DEFAULT 0"],
   ["proposals", "run_id", "TEXT"],
@@ -242,7 +244,7 @@ export function createGrowthTables(db: LearningDatabase): void {
     CREATE TABLE IF NOT EXISTS ledger_audit (
       audit_id TEXT PRIMARY KEY, learner_id TEXT NOT NULL, occurred_at INTEGER NOT NULL,
       actor TEXT NOT NULL CHECK (actor IN ('child','parent','system')),
-      reason_code TEXT NOT NULL CHECK (reason_code IN ('artifact_deleted','record_deleted','record_retracted','retention_pruned')),
+      reason_code TEXT NOT NULL CHECK (reason_code IN ('artifact_deleted','record_deleted','record_retracted','retention_pruned','record_scope_narrowed','record_downgraded')),
       subject_kind TEXT NOT NULL CHECK (subject_kind IN ('artifact','growth_record','sweep')),
       subject_id TEXT NOT NULL,
       n_events INTEGER NOT NULL DEFAULT 0, n_outbound INTEGER NOT NULL DEFAULT 0, n_snapshots INTEGER NOT NULL DEFAULT 0,
@@ -271,5 +273,25 @@ export function openLearningDatabase(path: string): LearningDatabase {
   `);
   createSessionTables(db);
   createGrowthTables(db);
+  // 旧库的 CHECK 不能 ALTER。事务内原样复制审计行，仅扩充合法动作枚举。
+  const auditSql = String(db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='ledger_audit'").get()?.sql ?? "");
+  if (!auditSql.includes("record_scope_narrowed")) {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      db.exec(auditSql.replace("ledger_audit", "ledger_audit_next").replace("'retention_pruned'", "'retention_pruned','record_scope_narrowed','record_downgraded'"));
+      db.exec("INSERT INTO ledger_audit_next SELECT * FROM ledger_audit");
+      db.exec("DROP TABLE ledger_audit");
+      db.exec("ALTER TABLE ledger_audit_next RENAME TO ledger_audit");
+      db.exec("COMMIT");
+    } catch (error) { db.exec("ROLLBACK"); db.close(); throw error; }
+  }
+  // 重启后候选仍需用原儿童版短语渲染，不能依赖进程内的插件缓存。
+  addColumnIfMissing(db, "challenge_runs", "child_facing_goal_phrase", "TEXT NOT NULL DEFAULT ''");
+  addColumnIfMissing(db, "challenge_runs", "surface_context_label", "TEXT NOT NULL DEFAULT ''");
+  addColumnIfMissing(db, "memory_candidates", "forbidden_patterns_json", "TEXT NOT NULL DEFAULT '[]'");
+  addColumnIfMissing(db, "memory_candidates", "known_hypothesis_keys_json", "TEXT NOT NULL DEFAULT '[]'");
+  addColumnIfMissing(db, "challenge_runs", "plugin_policy_json", "TEXT NOT NULL DEFAULT '{}' ");
+  addColumnIfMissing(db, "memory_decisions", "source_link_ids_json", "TEXT NOT NULL DEFAULT '[]'");
+  addColumnIfMissing(db, "memory_decisions", "source_run_ids_json", "TEXT NOT NULL DEFAULT '[]'");
   return db;
 }

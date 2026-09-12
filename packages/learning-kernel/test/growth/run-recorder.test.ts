@@ -15,6 +15,39 @@ const evidence = (id: string, direction: "supports" | "weakens"): DisciplineEvid
   surfaceContextKey: challenge.surfaceContextKey, selfCorrection: false,
 });
 
+test("探针预算独立且两次之间必须新产出，重启不能绕过", () => {
+  const r = start();
+  expect(r.canIssueProbe()).toBe(true);
+  expect(r.noteProbeIssued("p1", ["h1", "h2"], 1)).toBe(true);
+  expect(r.canIssueProbe()).toBe(false);
+  expect(RunRecorder.from(r.toJSON()).canIssueProbe()).toBe(false);
+  expect(r.noteProbeIssued("p2", ["h1", "h2"], 2)).toBe(false);
+  for (const id of ["p2", "p3"]) { r.noteChildOutput(3); expect(r.noteProbeIssued(id, ["h1", "h2"], 4)).toBe(true); }
+  r.noteChildOutput(5);
+  expect(r.canIssueProbe()).toBe(false);
+  expect(r.snapshot(6)).toMatchObject({ probesIssued: 3, maxHintLevelUsed: 0, escalationCount: 0 });
+});
+test("探针只凭当前前二的相反方向解决，新候选进入后失效", () => {
+  const r = start();
+  const supports = [{ hypothesisId: "h1", direction: "supports" as const }, { hypothesisId: "h2", direction: "weakens" as const }];
+  r.noteEvidence({ ...evidence("x", "supports"), hypothesisSupport: supports }, 1);
+  r.noteProbeIssued("p", ["h1", "h2"], 2);
+  r.noteProbeOutcome("x", supports.slice(0, 1));
+  expect(r.snapshot(3).probeResolved).toBe(false);
+  r.noteProbeOutcome("x", supports);
+  expect(r.snapshot(3).probeResolved).toBe(true);
+  r.noteEvidence({ ...evidence("y", "supports"), hypothesisSupport: [{ hypothesisId: "h3", direction: "supports" }] }, 4);
+  expect(r.snapshot(5).probeResolved).toBe(false);
+});
+test("序列化与恢复的嵌套事实不能从外部改写", () => {
+  const r = start(); r.noteEvidence(evidence("x", "supports"), 1);
+  const state = r.toJSON(); const restored = RunRecorder.from(state);
+  state.run!.supportCount.h1 = 999; state.run!.usedProbeIds.push("injected");
+  expect(r.activeCandidates()[0]?.supporting).toBe(1);
+  expect(restored.activeCandidates()[0]?.supporting).toBe(1);
+  expect(restored.usedProbeIds()).toEqual([]);
+});
+
 describe("一轮挑战的记账", () => {
   test("开轮生成新标识并把上一轮的记账清干净", () => {
     const recorder = start();
@@ -120,6 +153,21 @@ describe("自我修正与活跃候选", () => {
     recorder.noteEvidence({ ...evidence("b", "supports"), hypothesisSupport: [{ hypothesisId: "h2", direction: "supports" }] }, 2);
     recorder.noteEvidence({ ...evidence("c", "supports"), hypothesisSupport: [{ hypothesisId: "h2", direction: "supports" }] }, 3);
     expect(recorder.activeCandidates().map((c) => c.hypothesisKey)).toEqual(["h2", "h1"]);
+  });
+
+  test("本轮最多三个活跃候选，第四个保留证据但不参与当前选择", () => {
+    const recorder = start();
+    for (const key of ["h1", "h2", "h3", "h4"]) recorder.noteEvidence({ ...evidence(key, "supports"), hypothesisSupport: [{ hypothesisId: key, direction: "supports" }] }, 1);
+    expect(recorder.activeCandidates().map(c => c.hypothesisKey)).toEqual(["h1", "h2", "h3"]);
+  });
+
+  test("新区分任务可从没有旧候选开始，只有明确相反结果才标记区分完成", () => {
+    const recorder = start();
+    recorder.noteProbeIssued("new-probe", ["h1", "h2"], 1);
+    recorder.noteProbeOutcome("unclear", [{ hypothesisId: "h1", direction: "supports" }]);
+    expect(recorder.snapshot(2).probeResolved).toBe(false);
+    recorder.noteProbeOutcome("different", [{ hypothesisId: "h1", direction: "supports" }, { hypothesisId: "h2", direction: "weakens" }]);
+    expect(recorder.snapshot(3)).toMatchObject({ probeResolved: true, discriminates: ["h1", "h2"] });
   });
 });
 

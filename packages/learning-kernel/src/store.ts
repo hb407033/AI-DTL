@@ -5,6 +5,14 @@ import type { ChildOutbound, EvidenceQuality, SemanticObject, TeachingProposal }
 import type { DisciplineEvidence, LearningChallenge } from "./challenge.js";
 import type { StoredEvent } from "./event-log.js";
 import type { SessionContext } from "./session-state.js";
+import type { RunRecorderState } from "./growth/run-recorder.js";
+import type { ContestTarget } from "./growth/types.js";
+import { redactProposalForStorage } from "./growth/retention.js";
+
+export interface MemoryPreviewState {
+  candidateId: string; nonce: string; tier: 2 | 3; childFacingText: string; evidenceSummaryText: string;
+  contestTarget: ContestTarget; shownAt: number;
+}
 
 export interface SessionRecord { sessionId: string; discipline: string; challenge: LearningChallenge; createdAt: number }
 
@@ -14,6 +22,13 @@ export interface ProposalRecord {
   reasons: string[];
   proposal: TeachingProposal;
   decidedAt: number;
+  runId?: string | undefined;
+}
+
+/** 模型的自由记忆句只参与进程内对齐；提案存档不能旁路写入儿童结论。 */
+export function proposalForStorage(proposal: TeachingProposal): TeachingProposal {
+  const { memoryCandidate: _candidate, ...safe } = proposal;
+  return structuredClone(safe);
 }
 
 /** 编排器的运行时：不属于状态机上下文、但重启后必须还原的东西（设计稿 13「服务重启」） */
@@ -24,10 +39,18 @@ export interface OrchestratorRuntime {
   lastProposalId: string | null;
   lastLearnerTask: string;
   lastSpoken: string | null;
+  lastTaskContestTarget?: ContestTarget | undefined;
+  lastSpeakContestTarget?: ContestTarget | undefined;
   windowStartedAt: number;
   lastNewStrategyAt: number;
   /** 出站消息编号；重启后续号，否则会与重启前发出的 id 撞号 */
   outboundCounter?: number | undefined;
+  runRecorder?: RunRecorderState | undefined;
+  artifactVersionId?: string | undefined;
+  previewNonceCounter?: number | undefined;
+  memoryPreview?: MemoryPreviewState | undefined;
+  bridgeCandidateRejected?: boolean | undefined;
+  pendingProbe?: { probeId: string; discriminates: readonly [string, string]; issuedAt: number } | undefined;
 }
 
 export interface SessionSnapshot {
@@ -111,7 +134,10 @@ export class InMemorySessionStore implements SessionStore {
   listEvents(sessionId: string): StoredEvent[] { return [...(this.events.get(sessionId)?.values() ?? [])].sort((a, b) => a.serverSeq - b.serverSeq); }
   saveOutbound(sessionId: string, eventId: string, messages: ChildOutbound[]): void { this.outbound.set(`${sessionId}/${eventId}`, messages); }
   getOutbound(sessionId: string, eventId: string): ChildOutbound[] | null { return this.outbound.get(`${sessionId}/${eventId}`) ?? null; }
-  saveProposal(sessionId: string, record: ProposalRecord): void { this.proposals.set(sessionId, [...(this.proposals.get(sessionId) ?? []), record]); }
+  saveProposal(sessionId: string, record: ProposalRecord): void {
+    const safe = record.accepted ? record : redactProposalForStorage(record);
+    this.proposals.set(sessionId, [...(this.proposals.get(sessionId) ?? []), { ...safe, proposal: proposalForStorage(safe.proposal) }]);
+  }
   listProposals(sessionId: string): ProposalRecord[] { return [...(this.proposals.get(sessionId) ?? [])]; }
   saveSnapshot(sessionId: string, snapshot: SessionSnapshot): void { this.snapshots.set(sessionId, [...(this.snapshots.get(sessionId) ?? []), structuredClone(snapshot)]); }
   latestSnapshot(sessionId: string): SessionSnapshot | null { const list = this.snapshots.get(sessionId) ?? []; return list[list.length - 1] ?? null; }

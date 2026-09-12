@@ -27,7 +27,7 @@ export const teachingProposalSchema = z.object({
   learnerTask: z.string().min(1),
   expectedEvidence: z.array(z.string()).default([]),
   hintLevel: hintLevelSchema,
-  memoryCandidate: z.object({ description: z.string().min(1), evidenceEventIds: z.array(z.string()) }).optional(),
+  memoryCandidate: z.object({ description: z.string().min(1), evidenceEventIds: z.array(z.string()), hypothesisKeys: z.array(z.string()).optional() }).optional(),
 });
 
 export type SemanticObject = z.infer<typeof semanticObjectSchema>;

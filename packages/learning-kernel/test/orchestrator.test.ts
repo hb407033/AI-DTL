@@ -187,12 +187,12 @@ describe("15.3 场景：模型越级与非法画布对象", () => {
 });
 
 describe("15.3 场景：孩子反驳 Agent", () => {
-  test("异议冻结最近提案，停止追问并问“哪里和你的想法不一样？”，状态不变、不计提示", async () => {
+  test("异议冻结最近提案，进入异议态并问“哪里和你的想法不一样？”，不计提示", async () => {
     const h = harness([{ purpose: "hint", proposal: P("p-1", 1) }]);
     await h.orch.start();
     await h.send({ type: "HELP_REQUEST" });
-    const r = await h.send({ type: "CONTEST" });
-    expect(h.orch.context).toMatchObject({ state: "INTERVENING", hintLevel: 1, frozenTargetIds: ["p-1"] });
+    const r = await h.send({ type: "CONTEST", target: { kind: "proposal", id: "p-1" } });
+    expect(h.orch.context).toMatchObject({ state: "CONTESTED", hintLevel: 1, frozenTargets: [{ kind: "proposal", id: "p-1" }] });
     expect(r.outbound.find((m) => m.type === "speak")).toMatchObject({ text: "哪里和你的想法不一样？", hintLevel: 0 });
   });
 });

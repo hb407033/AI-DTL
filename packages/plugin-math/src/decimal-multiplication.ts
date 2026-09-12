@@ -138,6 +138,13 @@ export const mathPlugin: DisciplinePlugin = {
   },
   createChallenge(input) {
     const band = input.difficultyBand === "lower" ? "lower" : "base";
+    if (input.requiredProbeId) {
+      const challenge = buildChallenge({ a: 4.2, b: 0.6, product: 2.52, band }, `math-decimal-verify-${input.requiredProbeId}`, input);
+      const probe = mathPlugin.discriminatingProbes(challenge).find(p => p.id === input.requiredProbeId);
+      const pair = input.competingHypothesisIds;
+      if (!probe || !pair || pair.length !== 2 || pair[0] === pair[1] || !pair.every(key => Object.values(probe.outcomes).some(support => support.some(s => s.hypothesisId === key)))) throw new Error("Unsupported discriminating challenge");
+      return { ...challenge, probeId: probe.id, discriminates: [...pair], learnerPrompt: `${challenge.learnerPrompt} ${probe.question}` };
+    }
     return buildChallenge(PRODUCTS[band] ?? PRODUCTS.base!, `math-decimal-${band}`, input);
   },
   interpretEvent(challenge, event, history) {

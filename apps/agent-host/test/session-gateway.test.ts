@@ -75,7 +75,8 @@ describe("断线暂停与重启续接（设计稿 13）", () => {
     const reopened = await host.open("s-1");
     expect(host.parentView("s-1").state).toBe("INTERVENING");
     const kinds = reopened.map((f) => (f.type === "outbound" ? f.message.type : f.type));
-    expect(kinds).toEqual(["stateChanged", "learnerTask", "canvasAction", "speak", "stateChanged"]);   // 画面快照 + 恢复通知
+    expect(kinds).toEqual(["stateChanged", "stateChanged", "learnerTask", "canvasAction", "speak"]);   // 先恢复，再构造恢复后的画面快照
+    expect(reopened.slice(0, 2)).toEqual(expect.arrayContaining([expect.objectContaining({ message: expect.objectContaining({ state: "INTERVENING" }) })]));
   });
 
   test("宿主重启：新 host 用同一个 store 打开旧会话，得到当前画面；旧帧重放仍是原 ack", async () => {

@@ -7,6 +7,7 @@ export const SESSION_PROTOCOL_VERSION = 1 as const;
 export const evidenceQualitySchema = z.enum(["unconfirmed", "confirmed", "corrected"]);
 export const evidenceSourceSchema = z.enum(["child_touch", "child_voice", "child_button", "parent_button", "system"]);
 const point = z.object({ x: z.number(), y: z.number() });
+export const contestTargetSchema = z.object({ kind: z.enum(["proposal", "hypothesis", "candidate", "record", "session"]), id: z.string().min(1) });
 
 export const eventPayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("UTTERANCE"), text: z.string() }),
@@ -23,11 +24,11 @@ export const eventPayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("HELP_REQUEST") }),
   z.object({ type: z.literal("PAUSE_REQUEST"), by: z.enum(["child", "parent"]) }),
   z.object({ type: z.literal("RESUME_REQUEST") }),
-  z.object({ type: z.literal("CONTEST"), targetId: z.string().optional() }),
+  z.object({ type: z.literal("CONTEST"), target: contestTargetSchema }),
   z.object({ type: z.literal("DONE") }),
   z.object({ type: z.literal("CONFIRM_TRANSCRIPT"), targetEventId: z.string().min(1), confirmed: z.boolean(), correctedText: z.string().optional() }),
   z.object({ type: z.literal("SOFT_LANDING_CHOICE"), choice: z.enum(["simpler", "hint", "stop"]) }),
-  z.object({ type: z.literal("MEMORY_ASSENT"), choice: z.enum(["record", "unsure", "disagree"]) }),
+  z.object({ type: z.literal("MEMORY_ASSENT"), candidateId: z.string().min(1), previewNonce: z.string().min(1), choice: z.enum(["record", "unsure", "disagree"]) }),
 ]);
 
 export const evidenceEventSchema = z.object({

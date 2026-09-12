@@ -12,7 +12,7 @@ describe("脚本回放", () => {
     expect(trace.finalState).toBe("COMPLETED");
     expect(trace.hintLevels).toEqual([1, 2]);
     expect(trace).toMatchObject({ maxHintLevelUsed: 2, independentSuccess: true, assistedRound: false, policyErrors: 0 });
-    expect(trace.outbound.filter((m) => m.type === "speak").map((m) => (m as { text: string }).text)).toEqual(["你现在已经确定了什么？", "0.3 还能换成什么说法？"]);
+    expect(trace.outbound.filter((m) => m.type === "speak").map((m) => (m as { text: string }).text)).toEqual(["算之前先说：结果会比 2.4 大还是小？", "你现在已经确定了什么？", "0.3 还能换成什么说法？"]);
   });
   test("迁移答错以 SOFT_LANDING 结束", async () => {
     const wrong = { ...childEvents, steps: [...childEvents.steps.slice(0, -1), { atMs: 100000, payload: { type: "ANSWER", text: "14" } }] };

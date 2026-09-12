@@ -2,7 +2,7 @@
 // 会话网关的纯逻辑：把 WebSocket 文本帧变成编排器调用，把编排器输出包成 ServerFrame。
 // 一个进程内可同时承载多个会话；每个会话一个编排器与一个桥接实例。不碰 socket，便于测试。
 import {
-  ParentCoachBridge, SessionOrchestrator, type DisciplinePlugin, type ParentInput, type RealtimeBridge, type SessionStore, type TurnContext,
+  ParentCoachBridge, SessionOrchestrator, type DisciplinePlugin, type ParentInput, type RealtimeBridge, type SessionStore, type TurnContext, type GrowthSessionPort, type GrowthAssentPort,
 } from "@ai-scholar/learning-kernel";
 import { SESSION_PROTOCOL_VERSION, clientFrameSchema, type ChildOutbound, type ServerFrame } from "@ai-scholar/session-contracts";
 
@@ -12,6 +12,9 @@ export interface SessionHostOptions {
   makeBridge: (sessionId: string) => RealtimeBridge;
   clock: () => number;
   curriculumAnchor?: string | undefined;
+  learnerId?: string | undefined;
+  ledger?: GrowthSessionPort | undefined;
+  assent?: GrowthAssentPort | undefined;
 }
 
 export interface ParentView {
@@ -50,6 +53,14 @@ export function createSessionHost(options: SessionHostOptions) {
   }
 
   const host = {
+    dispose(): void { for (const session of sessions.values()) session.orchestrator.dispose(); sessions.clear(); parentBridges.clear(); },
+    invalidate(sessionIds: readonly string[]): void {
+      for (const sessionId of sessionIds) {
+        sessions.get(sessionId)?.orchestrator.dispose();
+        sessions.delete(sessionId); parentBridges.delete(sessionId);
+        host.broadcast(sessionId, wrap([{ type: "notice", id: `deleted-${options.clock()}`, text: "相关内容已删除，请重新连接；继续学习时请开启新的会话。" }]));
+      }
+    },
     /** 家长桥接按会话懒创建；makeBridge 返回它就让该会话走家长接管 */
     parentBridge(sessionId: string): ParentCoachBridge {
       const bridge = parentBridges.get(sessionId) ?? new ParentCoachBridge();
@@ -61,18 +72,19 @@ export function createSessionHost(options: SessionHostOptions) {
     async open(sessionId: string): Promise<ServerFrame[]> {
       const existing = sessions.get(sessionId);
       if (existing) {
-        return wrap([...existing.orchestrator.viewSnapshot(), ...existing.orchestrator.techRecovered()]);
+        return wrap([...existing.orchestrator.techRecovered(), ...existing.orchestrator.viewSnapshot()]);
       }
       const bridge = options.makeBridge(sessionId);
       if (bridge instanceof ParentCoachBridge) parentBridges.set(sessionId, bridge);
       const deps = {
         sessionId, plugin: options.plugin, bridge, store: options.store, clock: options.clock,
+        learnerId: options.learnerId, ledger: options.ledger, assent: options.assent,
         challengeInput: { curriculumAnchor: options.curriculumAnchor ?? options.plugin.manifest.curriculumVersions[0] ?? "" },
       };
       const restored = SessionOrchestrator.restore(deps);
       if (restored) {
         sessions.set(sessionId, { orchestrator: restored, bridge, chain: Promise.resolve() });
-        return wrap([...restored.viewSnapshot(), ...restored.techRecovered()]);
+        return wrap([...restored.techRecovered(), ...restored.viewSnapshot()]);
       }
       const orchestrator = new SessionOrchestrator(deps);
       sessions.set(sessionId, { orchestrator, bridge, chain: Promise.resolve() });
@@ -89,6 +101,7 @@ export function createSessionHost(options: SessionHostOptions) {
 
     /** 只回 ack/nack/error；教学输出经 subscribe 推送。重放时把当时的出站消息一并补发 */
     async handleFrame(sessionId: string, raw: string, now: number): Promise<ServerFrame[]> {
+      if (!sessions.has(sessionId)) return [{ protocolVersion: v, type: "error", reason: "sessionInvalidatedReconnectRequired" }];
       let json: unknown;
       try { json = JSON.parse(raw); } catch { return [{ protocolVersion: v, type: "error", reason: "invalidJson" }]; }
       const parsed = clientFrameSchema.safeParse(json);
@@ -108,12 +121,13 @@ export function createSessionHost(options: SessionHostOptions) {
     },
 
     async tick(sessionId: string, now: number): Promise<void> {
+      if (!sessions.has(sessionId)) return;
       enqueue(sessionId, () => live(sessionId).orchestrator.tick(now));
       await host.idle(sessionId);
     },
 
     /** 等该会话的处理链空闲（测试与家长 API 用） */
-    async idle(sessionId: string): Promise<void> { await live(sessionId).chain; },
+    async idle(sessionId: string): Promise<void> { await sessions.get(sessionId)?.chain; },
 
     parentView(sessionId: string): ParentView {
       const { orchestrator } = live(sessionId);

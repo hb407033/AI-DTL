@@ -5,12 +5,17 @@ import type { ChildOutbound, EvidenceQuality } from "@ai-scholar/session-contrac
 import type { LearningDatabase } from "./growth/database.js";
 import type { StoredEvent } from "./event-log.js";
 import type { ProposalRecord, SessionRecord, SessionSnapshot, SessionStore } from "./store.js";
+import { proposalForStorage } from "./store.js";
+import { redactProposalForStorage } from "./growth/retention.js";
 
 export class SqliteSessionStore implements SessionStore {
 
   constructor(private readonly db: LearningDatabase) {}
 
+  private deleted(sessionId: string): boolean { return !!this.db.prepare("SELECT content_deleted FROM sessions WHERE session_id=?").get(sessionId)?.content_deleted; }
+
   createSession(record: SessionRecord): void {
+    if (this.deleted(record.sessionId)) throw new Error("sessionContentDeleted");
     this.db.prepare("INSERT OR REPLACE INTO sessions (session_id, discipline, challenge_json, created_at) VALUES (?, ?, ?, ?)")
       .run(record.sessionId, record.discipline, JSON.stringify(record.challenge), record.createdAt);
   }
@@ -22,6 +27,7 @@ export class SqliteSessionStore implements SessionStore {
   }
 
   appendEvent(sessionId: string, stored: StoredEvent, artifactVersionId?: string | undefined): void {
+    if (this.deleted(sessionId)) throw new Error("sessionContentDeleted");
     this.db.prepare("INSERT OR IGNORE INTO events (event_id, session_id, client_seq, server_seq, content_hash, quality, event_json, received_at, artifact_version_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
       .run(stored.event.eventId, sessionId, stored.event.clientSeq, stored.serverSeq, stored.contentHash, stored.event.quality, JSON.stringify(stored.event), stored.receivedAt, artifactVersionId ?? null);
     // 转写确认是派生索引：原事件行永不改写，这张表随时可以从 events 重建
@@ -59,6 +65,7 @@ export class SqliteSessionStore implements SessionStore {
   }
 
   saveOutbound(sessionId: string, eventId: string, messages: ChildOutbound[]): void {
+    if (this.deleted(sessionId) || this.db.prepare("SELECT redacted FROM outbound WHERE session_id=? AND event_id=?").get(sessionId, eventId)?.redacted) return;
     this.db.prepare("INSERT OR REPLACE INTO outbound (session_id, event_id, messages_json) VALUES (?, ?, ?)").run(sessionId, eventId, JSON.stringify(messages));
   }
 
@@ -68,8 +75,10 @@ export class SqliteSessionStore implements SessionStore {
   }
 
   saveProposal(sessionId: string, record: ProposalRecord): void {
-    this.db.prepare("INSERT INTO proposals (session_id, proposal_id, accepted, reasons_json, proposal_json, decided_at) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(sessionId, record.proposalId, record.accepted ? 1 : 0, JSON.stringify(record.reasons), JSON.stringify(record.proposal), record.decidedAt);
+    if (this.deleted(sessionId)) return;
+    const safe = record.accepted ? record : redactProposalForStorage(record);
+    this.db.prepare("INSERT INTO proposals (session_id, proposal_id, accepted, reasons_json, proposal_json, decided_at,run_id) VALUES (?, ?, ?, ?, ?, ?,?)")
+      .run(sessionId, record.proposalId, record.accepted ? 1 : 0, JSON.stringify(record.reasons), JSON.stringify(proposalForStorage(safe.proposal)), record.decidedAt, record.runId ?? null);
   }
 
   listProposals(sessionId: string): ProposalRecord[] {
@@ -79,6 +88,7 @@ export class SqliteSessionStore implements SessionStore {
   }
 
   saveSnapshot(sessionId: string, snapshot: SessionSnapshot): void {
+    if (this.deleted(sessionId)) return;
     this.db.prepare("INSERT OR REPLACE INTO snapshots (session_id, snapshot_seq, snapshot_json, created_at) VALUES (?, ?, ?, ?)")
       .run(sessionId, snapshot.snapshotSeq, JSON.stringify(snapshot), snapshot.createdAt);
   }

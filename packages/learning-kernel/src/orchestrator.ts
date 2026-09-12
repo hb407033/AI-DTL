@@ -9,11 +9,21 @@ import { clampBudget, evaluateEscalation, nextHintRung, type InterventionBudget 
 import type { DisciplinePlugin } from "./plugin.js";
 import { validateProposal } from "./proposal-validator.js";
 import { createSessionContext, transition, type SessionContext, type Signal } from "./session-state.js";
-import { shouldSnapshot, type OrchestratorRuntime, type SessionStore } from "./store.js";
+import { shouldSnapshot, type MemoryPreviewState, type OrchestratorRuntime, type SessionStore } from "./store.js";
 import { resolveConfirmedEvents } from "./transcript-confirmation.js";
+import { RunRecorder } from "./growth/run-recorder.js";
+import { NULL_LEDGER } from "./growth/null-ledger.js";
+import type { GrowthAssentPort, GrowthSessionPort } from "./growth/ports.js";
+import type { ContestTarget, MemoryCandidate, SessionGateSnapshot } from "./growth/types.js";
+import type { BridgeCandidate } from "./growth/candidate.js";
+import { createHash } from "node:crypto";
+import { selectDiscriminatingProbe, separatesTwo } from "./growth/probe-selection.js";
 
 export interface OrchestratorDeps {
   sessionId: string;
+  learnerId?: string | undefined;
+  ledger?: GrowthSessionPort | undefined;
+  assent?: GrowthAssentPort | undefined;
   plugin: DisciplinePlugin;
   bridge: RealtimeBridge;
   store: SessionStore;
@@ -46,6 +56,8 @@ export class SessionOrchestrator {
   private lastProposalId: string | null = null;
   private lastLearnerTask = "";
   private lastSpoken: string | null = null;
+  private lastTaskContestTarget: ContestTarget | undefined;
+  private lastSpeakContestTarget: ContestTarget | undefined;
   private windowStartedAt = 0;
   private lastNewStrategyAt = 0;
   private confirmationAskedAt: number | null = null;
@@ -54,10 +66,26 @@ export class SessionOrchestrator {
   private snapshotSeq = 0;
   private eventsSinceSnapshot = 0;
   private lastSnapshotAt = 0;
+  private recorder: RunRecorder;
+  private readonly ledger: GrowthSessionPort;
+  private readonly assentSink: GrowthAssentPort;
+  private readonly learnerId: string;
+  private memoryPreview: MemoryPreviewState | undefined;
+  private previewNonceCounter = 0;
+  private artifactVersionId: string | undefined;
+  private lastMemoryCandidate: BridgeCandidate | undefined;
+  private bridgeCandidateRejected = false;
+  private pendingProbe: OrchestratorRuntime["pendingProbe"];
 
   constructor(private readonly deps: OrchestratorDeps) {
-    this.challenge = deps.plugin.createChallenge(deps.challengeInput);
+    this.learnerId = deps.learnerId ?? "child-1";
+    this.ledger = deps.ledger ?? NULL_LEDGER.session;
+    this.assentSink = deps.assent ?? NULL_LEDGER.assent;
+    this.challenge = deps.plugin.createChallenge({ ...deps.challengeInput,
+      knownRecords: this.ledger.activeModel(this.learnerId, deps.plugin.manifest.id).map(record => ({ recordId: record.recordId, claimKey: record.claimKey, developmentGoalId: record.targetObject.id, ...record.scope })),
+      dueReviews: this.ledger.dueReviews(this.learnerId, deps.plugin.manifest.id, deps.clock()) });
     this.budget = clampBudget(this.challenge.interventionBudget);
+    this.recorder = new RunRecorder(deps.sessionId, this.learnerId);
   }
 
   /** 宿主重启：从最新快照重建，快照之后的事件只灌回日志与证据，不触发桥接、不重发提示。库里没有则返回 null */
@@ -66,6 +94,11 @@ export class SessionOrchestrator {
     if (!snapshot) return null;
     const orch = new SessionOrchestrator(deps);
     orch.context = snapshot.context;
+    // 旧快照升级：旧版冻结集合只记录提案 id，迁移时保留冻结而非清空。
+    if (!orch.context.frozenTargets) {
+      const legacy = snapshot.context as SessionContext & { frozenTargetIds?: string[] };
+      orch.context = { ...snapshot.context, frozenTargets: (legacy.frozenTargetIds ?? []).map(id => ({ kind: "proposal", id })) };
+    }
     orch.challenge = snapshot.challenge;
     orch.transferChallenge = snapshot.transferChallenge;
     orch.evidence = [...snapshot.evidence];
@@ -79,9 +112,17 @@ export class SessionOrchestrator {
       orch.lastProposalId = snapshot.runtime.lastProposalId;
       orch.lastLearnerTask = snapshot.runtime.lastLearnerTask;
       orch.lastSpoken = snapshot.runtime.lastSpoken;
+      orch.lastTaskContestTarget = snapshot.runtime.lastTaskContestTarget;
+      orch.lastSpeakContestTarget = snapshot.runtime.lastSpeakContestTarget;
       orch.windowStartedAt = snapshot.runtime.windowStartedAt;
       orch.lastNewStrategyAt = snapshot.runtime.lastNewStrategyAt;
       orch.outboundCounter = snapshot.runtime.outboundCounter ?? 0;   // 续号，避免重启后与历史出站 id 撞号
+      if (snapshot.runtime.runRecorder) orch.recorder = RunRecorder.from(snapshot.runtime.runRecorder);
+      orch.memoryPreview = snapshot.runtime.memoryPreview;
+      orch.previewNonceCounter = snapshot.runtime.previewNonceCounter ?? 0;
+      orch.artifactVersionId = snapshot.runtime.artifactVersionId;
+      orch.bridgeCandidateRejected = snapshot.runtime.bridgeCandidateRejected ?? false;
+      orch.pendingProbe = snapshot.runtime.pendingProbe;
     }
     const events = deps.store.listEvents(deps.sessionId);
     orch.log = new EventLog(events);
@@ -117,12 +158,12 @@ export class SessionOrchestrator {
   /** 当前画面：重连或重开 App 时发给儿童端，让它不靠历史消息也能画出现在的状态 */
   viewSnapshot(): ChildOutbound[] {
     const out: ChildOutbound[] = [];
-    let n = 0;
-    const id = () => `snap-${++n}`;
+    const id = () => `o-${++this.outboundCounter}`;
     out.push({ type: "stateChanged", id: id(), state: this.context.state, hintLevel: this.context.hintLevel, presence: presenceFor(this.context.state) });
-    out.push({ type: "learnerTask", id: id(), text: this.lastLearnerTask || this.taskForCurrentState() });
+    out.push({ type: "learnerTask", id: id(), text: this.lastLearnerTask || this.taskForCurrentState(), contestTarget: this.lastTaskContestTarget ?? { kind: "session", id: this.deps.sessionId } });
     for (const object of this.agentObjects) out.push({ type: "canvasAction", id: id(), action: { kind: "upsertObject", object } });
-    if (this.lastSpoken !== null) out.push({ type: "speak", id: id(), text: this.lastSpoken, hintLevel: this.context.hintLevel, interruptible: true });
+    if (this.lastSpoken !== null) out.push({ type: "speak", id: id(), text: this.lastSpoken, hintLevel: this.context.hintLevel, interruptible: true, contestTarget: this.lastSpeakContestTarget ?? { kind: "session", id: this.deps.sessionId } });
+    if (this.context.state === "MEMORY_PENDING" && this.memoryPreview) this.pushPreview(out);
     return out;
   }
 
@@ -156,11 +197,17 @@ export class SessionOrchestrator {
     return out;
   }
 
+  private disposed = false;
+  /** 删除提交后取消旧运行时；异步桥接返回也不得恢复旧内容。 */
+  dispose(): void { this.disposed = true; void this.deps.bridge.stop(); }
+
   /** 第一步：同步进日志与存储。重放/缺口/冲突在这里就能回答，不等教学逻辑 */
   acceptEvent(event: EvidenceEvent, receivedAt: number = this.deps.clock()): AppendResult {
+    if (this.disposed) throw new Error("sessionRuntimeInvalidated");
     const append = this.log.append(event, receivedAt);
     if (append.kind === "appended") {
-      this.deps.store.appendEvent(this.deps.sessionId, append.stored);
+      this.deps.store.appendEvent(this.deps.sessionId, append.stored, this.artifactVersionId);
+      if (this.recorder.started) this.recorder.noteServerSeq(append.stored.serverSeq);
       this.eventsSinceSnapshot += 1;
     }
     return append;
@@ -168,10 +215,12 @@ export class SessionOrchestrator {
 
   /** 第二步：对已落盘的新事件跑教学逻辑，产出儿童端消息并按事件 id 存起来供重放 */
   async processAccepted(stored: StoredEvent): Promise<ChildOutbound[]> {
+    if (this.disposed) return [];
     const now = this.deps.clock();
     const before = this.context.state;
     const out: ChildOutbound[] = [];
     await this.route(stored.event, out, now);
+    if (this.disposed) return [];
     this.deps.store.saveOutbound(this.deps.sessionId, stored.event.eventId, out);
     this.snapshotIfNeeded(before !== this.context.state, now);
     return out;
@@ -185,6 +234,7 @@ export class SessionOrchestrator {
   }
 
   async tick(now: number): Promise<ChildOutbound[]> {
+    if (this.disposed) return [];
     const out: ChildOutbound[] = [];
     const before = this.context.state;
     if (this.context.state === "INDEPENDENT") {
@@ -216,11 +266,15 @@ export class SessionOrchestrator {
       case "PAUSE_REQUEST": this.apply({ kind: "pauseRequest" }, out); return;
       case "RESUME_REQUEST": this.apply({ kind: "resume" }, out); return;
       case "CONTEST":
-        if (this.apply({ kind: "contest", targetId: p.targetId ?? this.lastProposalId ?? undefined }, out)) {
+        if (this.apply({ kind: "contest", target: p.target }, out)) {
+          this.persistRun(now);
+          this.ledger.contest({ learnerId: this.learnerId, target: p.target, sessionId: this.deps.sessionId,
+            runId: this.recorder.snapshot(now).runId, eventId: event.eventId });
           this.pushSpeak(CONTEST_QUESTION, 0, out);
         }
         return;
       case "HELP_REQUEST":
+        if (this.context.state === "CONTESTED") { this.startContestVerification(out, now); return; }
         if (this.apply({ kind: "helpRequest" }, out)) await this.assess(out);
         return;
       case "DONE":
@@ -240,7 +294,7 @@ export class SessionOrchestrator {
         return;
       }
       case "SOFT_LANDING_CHOICE": await this.handleSoftLandingChoice(p.choice, out, now); return;
-      case "MEMORY_ASSENT": this.apply({ kind: "memoryAssent", choice: p.choice }, out); return;
+      case "MEMORY_ASSENT": this.handleMemoryAssent(event, out, now); return;
       case "ERASE": this.erasedHashes.add(p.contentHash); this.apply({ kind: "childOutput", isNewStrategy: false }, out); return;
       case "UTTERANCE":
         if (event.quality === "unconfirmed") {
@@ -264,9 +318,48 @@ export class SessionOrchestrator {
     const p = event.payload;
     const isNewStrategy = !(p.type === "STROKE" && this.erasedHashes.has(p.contentHash));
     const state = this.context.state;
+    if (state === "CONTESTED") return;
+    if (state === "ASSESSING" && this.pendingProbe && (p.type === "UTTERANCE" || p.type === "ANSWER" || p.type === "EXPLAIN")) {
+      const probe = this.deps.plugin.discriminatingProbes(this.challenge).find(item => item.id === this.pendingProbe?.probeId);
+      this.recorder.noteChildOutput(now);
+      const outcome = probe ? this.deps.plugin.classifyProbeOutcome(probe, p.text) : null;
+      if (probe && outcome && probe.outcomes[outcome]) {
+        const support = probe.outcomes[outcome];
+        const evidence: DisciplineEvidence = { evidenceId: `probe-${event.eventId}`, eventId: event.eventId, kind: "probe_outcome",
+          summary: outcome, hypothesisSupport: support, surfaceContextKey: this.challenge.surfaceContextKey, fromProbeId: probe.id, selfCorrection: false };
+        this.evidence.push(evidence);
+        this.recorder.noteEvidence(evidence, now);
+        this.recorder.noteProbeOutcome(outcome, support);
+      }
+      this.pendingProbe = undefined;
+      // 探针回答也是孩子对当前题目的产出；保留插件能明确识别的领域证据。
+      const interpreted = this.deps.plugin.interpretEvent(this.challenge, event, this.evidence);
+      this.evidence.push(...interpreted);
+      for (const evidence of interpreted) this.recorder.noteEvidence(evidence, now);
+      this.apply({ kind: "childOutput", isNewStrategy: true }, out);
+      await this.assess(out);
+      return;
+    }
     const current = state === "TRANSFER" && this.transferChallenge ? this.transferChallenge : this.challenge;
     const fresh = this.deps.plugin.interpretEvent(current, event, this.evidence);
     this.evidence.push(...fresh);
+    if (this.recorder.started) {
+      this.recorder.noteChildOutput(now);
+      for (const evidence of fresh) this.recorder.noteEvidence(evidence, now);
+      if (isNewStrategy) this.recorder.noteFirstProductiveAction(now);
+    }
+    if (state === "INDEPENDENT" && this.challenge.probeId && !this.recorder.snapshot(now).probeResolved && (p.type === "ANSWER" || p.type === "UTTERANCE" || p.type === "EXPLAIN")) {
+      const probe = this.deps.plugin.discriminatingProbes(this.challenge).find(item => item.id === this.challenge.probeId);
+      const outcome = probe ? this.deps.plugin.classifyProbeOutcome(probe, p.text) : null;
+      if (probe && outcome && probe.outcomes[outcome]) {
+        const support = probe.outcomes[outcome];
+        const evidence: DisciplineEvidence = { evidenceId: `probe-${event.eventId}`, eventId: event.eventId, kind: "probe_outcome", summary: outcome,
+          hypothesisSupport: support, surfaceContextKey: this.challenge.surfaceContextKey, fromProbeId: probe.id, selfCorrection: false };
+        this.evidence.push(evidence);
+        this.recorder.noteEvidence(evidence, now);
+        this.recorder.noteProbeOutcome(outcome, support);
+      }
+    }
     if (isNewStrategy) this.lastNewStrategyAt = now;
 
     if (state === "EXPLAIN_BACK" && p.type === "EXPLAIN") {
@@ -276,8 +369,23 @@ export class SessionOrchestrator {
       return;
     }
     if (state === "TRANSFER" && p.type === "ANSWER" && this.transferChallenge) {
-      if (this.deps.plugin.checkTransferAnswer(this.transferChallenge, p.text)) this.apply({ kind: "transferSucceeded", hasMemoryCandidate: false }, out);
-      else if (this.apply({ kind: "transferFailed" }, out)) out.push(this.msg({ type: "softLanding", message: SOFT_LANDING_MESSAGE, options: ["simpler", "hint", "stop"] }));
+      if (this.deps.plugin.checkTransferAnswer(this.transferChallenge, p.text)) {
+        this.recorder.noteTransferOutcome("succeeded");
+        const run = this.recorder.snapshot(now);
+        this.ledger.ingestRun({ learnerId: this.learnerId, run, evidence: this.evidence, pluginPolicy: this.pluginPolicy(),
+          qualityOf: id => this.deps.store.effectiveQualityOf(this.deps.sessionId, id),
+          artifactVersionOf: id => this.deps.store.listEvents(this.deps.sessionId).find(row => row.event.eventId === id)?.artifactVersionId ?? this.artifactVersionId ?? null });
+        const snapshot = this.gateSnapshot(now);
+        const candidate = this.ledger.nextCandidateToAsk(this.learnerId, this.challenge.discipline, snapshot) ??
+          this.ledger.buildAndPreflight({ learnerId: this.learnerId, run, snapshot,
+            bridgeCandidate: this.lastMemoryCandidate, bridgeCandidateRejected: this.bridgeCandidateRejected,
+            plugin: { forbiddenClaimPatterns: this.deps.plugin.manifest.forbiddenClaimPatterns,
+              knownHypothesisKeys: this.deps.plugin.manifest.hypothesisCatalog.map(item => item.id) } }).candidate;
+        if (this.apply({ kind: "transferSucceeded", hasMemoryCandidate: candidate !== null }, out) && candidate) this.emitMemoryPreview(candidate, out, now);
+      } else {
+        this.recorder.noteTransferOutcome("failed");
+        if (this.apply({ kind: "transferFailed" }, out)) out.push(this.msg({ type: "softLanding", message: SOFT_LANDING_MESSAGE, options: ["simpler", "hint", "stop"] }));
+      }
       return;
     }
     if (state === "RECONSTRUCT" && (p.type === "ANSWER" || p.type === "EXPLAIN")) {
@@ -288,6 +396,7 @@ export class SessionOrchestrator {
 
     const wasIntervening = state === "INTERVENING";
     if (!this.apply({ kind: "childOutput", isNewStrategy }, out)) return;
+    if (this.context.state === "ASSESSING") { await this.assess(out); return; }
     if (wasIntervening && this.context.state === "INDEPENDENT") this.withdrawAgentObjects(out);
     if (this.context.state === "INDEPENDENT" && this.deps.plugin.isExpectedEvidenceMet(this.challenge, this.evidence)) {
       if (this.apply({ kind: "childDone" }, out)) this.enterExplainBack(out);
@@ -297,9 +406,21 @@ export class SessionOrchestrator {
   // ---- 评估与提示 ----
   private async assess(out: ChildOutbound[]): Promise<void> {
     if (this.context.state !== "ASSESSING") return;
+    if (this.pendingProbe) return;
     if (this.deps.plugin.isExpectedEvidenceMet(this.challenge, this.evidence)) {
       if (this.apply({ kind: "assessedIndependentSolution" }, out)) this.enterExplainBack(out);
       return;
+    }
+    if (this.recorder.canIssueProbe() && !this.recorder.snapshot(this.deps.clock()).probeResolved) {
+      const blocked = new Set(this.ledger.blockedHypothesisKeys(this.learnerId, this.challenge.discipline));
+      const selected = selectDiscriminatingProbe({ activeCandidates: this.recorder.activeCandidates().filter(row => !blocked.has(row.hypothesisKey)),
+        probes: this.deps.plugin.discriminatingProbes(this.challenge), usedProbeIds: this.recorder.usedProbeIds() });
+      if (selected && this.apply({ kind: "probeIssued" }, out) && this.recorder.noteProbeIssued(selected.probe.id, selected.discriminates, this.deps.clock())) {
+        this.pendingProbe = { probeId: selected.probe.id, discriminates: selected.discriminates, issuedAt: this.deps.clock() };
+        this.pushSpeak(selected.probe.question, 0, out);
+        this.pushTask(selected.probe.question, out);
+        return;
+      }
     }
     const rung = nextHintRung(this.context);
     const verdict = evaluateEscalation(this.context, rung, this.budget);
@@ -320,9 +441,11 @@ export class SessionOrchestrator {
     let result: ReturnType<SessionOrchestrator["validate"]>;
     try {
       proposal = await this.deps.bridge.requestProposal(turn);
+      if (this.disposed) return;
       result = this.validate(proposal);
       if (!result.accepted) {
         proposal = await this.deps.bridge.requestProposal({ ...turn, rejectionReasons: result.reasons });
+        if (this.disposed) return;
         result = this.validate(proposal);
       }
     } catch {
@@ -345,11 +468,16 @@ export class SessionOrchestrator {
 
   private validate(proposal: TeachingProposal) {
     const result = validateProposal({ proposal, context: this.context, budget: this.budget, plugin: this.deps.plugin, protectedObjectIds: this.childObjectIds });
-    this.deps.store.saveProposal(this.deps.sessionId, { proposalId: proposal.proposalId, accepted: result.accepted, reasons: result.accepted ? [] : result.reasons, proposal, decidedAt: this.deps.clock() });
+    if (proposal.memoryCandidate) {
+      this.lastMemoryCandidate = { ...proposal.memoryCandidate, hypothesisKeys: proposal.memoryCandidate.hypothesisKeys ?? [] };
+      this.bridgeCandidateRejected ||= !result.accepted && result.reasons.some(reason => reason.startsWith("memory:"));
+    }
+    this.deps.store.saveProposal(this.deps.sessionId, { proposalId: proposal.proposalId, accepted: result.accepted, reasons: result.accepted ? [] : result.reasons, proposal, decidedAt: this.deps.clock(), runId: this.recorder.snapshot(this.deps.clock()).runId });
     return result;
   }
 
   private emitProposal(proposal: TeachingProposal, out: ChildOutbound[]): void {
+    this.ledger.recordProposalContext(this.learnerId, proposal.proposalId, this.recorder.activeCandidates().map(row => row.hypothesisKey));
     this.pushSpeak(proposal.spokenResponse, proposal.hintLevel, out);
     for (const action of proposal.canvasActions) {
       if (action.kind === "upsertObject") {
@@ -371,7 +499,45 @@ export class SessionOrchestrator {
     this.pushTask(this.challenge.explainBackSpec.prompt, out);
   }
 
+  private startContestVerification(out: ChildOutbound[], now: number): void {
+    const targetKeys = this.context.frozenTargets.filter(target => target.kind === "hypothesis").map(target => target.id);
+    const probes = this.deps.plugin.discriminatingProbes(this.challenge);
+    let selected: { id: string; pair: [string, string] } | undefined;
+    for (const probe of probes) {
+      const keys = [...new Set(Object.values(probe.outcomes).flat().map(s => s.hypothesisId))];
+      for (const a of keys) for (const b of keys) {
+        if ((!targetKeys.length || targetKeys.includes(a) || targetKeys.includes(b)) && separatesTwo(probe, a, b)) selected ??= { id: probe.id, pair: [a, b] };
+      }
+    }
+    if (!selected) { out.push(this.msg({ type: "notice", text: "这条先保持待核实；我还没有找到合适的新任务。" })); return; }
+    let challenge: LearningChallenge;
+    try {
+      challenge = this.deps.plugin.createChallenge({ ...this.deps.challengeInput, probeFamilyId: this.challenge.probeFamilyId,
+        difficultyBand: this.challenge.difficultyBand, requiredProbeId: selected.id, competingHypothesisIds: selected.pair });
+    } catch {
+      out.push(this.msg({ type: "notice", text: "这条先保持待核实；新任务还没准备好。" })); return;
+    }
+    if (challenge.probeId !== selected.id || !selected.pair.every(key => challenge.discriminates?.includes(key))) {
+      out.push(this.msg({ type: "notice", text: "这条先保持待核实；新任务还不能区分刚才的想法。" })); return;
+    }
+    if (!this.apply({ kind: "contestNewTask" }, out)) return;
+    this.persistRun(now, true);
+    this.challenge = challenge;
+    this.budget = clampBudget(challenge.interventionBudget);
+    this.transferChallenge = null;
+    this.evidence = [];
+    this.lastProposalId = null;
+    this.lastSpoken = null;
+    this.lastSpeakContestTarget = undefined;
+    this.withdrawAgentObjects(out);
+    this.apply({ kind: "challengeValidated" }, out);
+    this.recorder.noteProbeIssued(selected.id, selected.pair, now);
+    this.beginWindow(now);
+    this.pushTask(challenge.learnerPrompt, out);
+  }
+
   private enterTransfer(out: ChildOutbound[], now: number): void {
+    this.recorder.enterTransfer(now);
     this.transferChallenge = this.deps.plugin.createTransfer(this.challenge);
     this.beginWindow(now);
     this.pushTask(this.transferChallenge.learnerPrompt, out);
@@ -392,12 +558,100 @@ export class SessionOrchestrator {
     }
   }
 
+  private gateSnapshot(now: number): SessionGateSnapshot {
+    const run = this.recorder.snapshot(now);
+    return { sessionId: this.deps.sessionId, runId: run.runId, takenAt: now, state: this.context.state,
+      assistedRound: run.assistedRound, frozenTargets: this.context.frozenTargets,
+      maxHintLevelUsedInRound: run.maxHintLevelUsed, transferHintLevelUsedInRound: run.transferHintLevelUsed,
+      transferTainted: run.transferTainted, probeResolved: run.probeResolved, previewNonce: this.memoryPreview?.nonce ?? null };
+  }
+
+  private persistRun(now: number, closed = false): void {
+    if (!this.recorder.started) return;
+    const run = this.recorder.snapshot(now);
+    this.ledger.ingestRun({ learnerId: this.learnerId, run: closed ? run : { ...run, endedAt: null }, evidence: this.evidence, pluginPolicy: this.pluginPolicy(),
+      qualityOf: id => this.deps.store.effectiveQualityOf(this.deps.sessionId, id),
+      artifactVersionOf: id => this.deps.store.listEvents(this.deps.sessionId).find(row => row.event.eventId === id)?.artifactVersionId ?? this.artifactVersionId ?? null });
+  }
+
+  private pluginPolicy() { return { forbiddenClaimPatterns: this.deps.plugin.manifest.forbiddenClaimPatterns, knownHypothesisKeys: this.deps.plugin.manifest.hypothesisCatalog.map(row => row.id) }; }
+
+  private emitMemoryPreview(candidate: MemoryCandidate, out: ChildOutbound[], now: number): void {
+    const nonce = candidate.previewNonce ?? `pv-${this.deps.sessionId}-${++this.previewNonceCounter}`;
+    this.memoryPreview = { candidateId: candidate.candidateId, nonce, tier: candidate.tier,
+      childFacingText: candidate.childFacingText, evidenceSummaryText: candidate.evidenceSummaryText,
+      contestTarget: candidate.contestTarget, shownAt: candidate.shownAt ?? now };
+    this.ledger.markPreviewShown(this.learnerId, candidate.candidateId, nonce, now);
+    this.pushPreview(out);
+  }
+
+  private pushPreview(out: ChildOutbound[]): void {
+    const preview = this.memoryPreview;
+    if (!preview) return;
+    out.push(this.msg({ type: "memoryPreview", candidateId: preview.candidateId, previewNonce: preview.nonce,
+      tier: preview.tier, childFacingText: preview.childFacingText, evidenceSummaryText: preview.evidenceSummaryText,
+      contestTarget: preview.contestTarget }));
+  }
+
+  private handleMemoryAssent(event: EvidenceEvent, out: ChildOutbound[], now: number): void {
+    const p = event.payload;
+    if (p.type !== "MEMORY_ASSENT") return;
+    const preview = this.memoryPreview;
+    if (!preview || preview.candidateId !== p.candidateId || preview.nonce !== p.previewNonce) {
+      this.context.policyErrors.push({ code: "guardFailed", from: this.context.state, signal: "memoryAssent" });
+      out.push(this.msg({ type: "notice", text: "我这边没找到刚才那张卡片，我们重新看一次。" }));
+      if (this.context.state === "MEMORY_PENDING") this.pushPreview(out);
+      return;
+    }
+    const snapshot = this.gateSnapshot(now);
+    const input = { learnerId: this.learnerId, candidateId: p.candidateId, previewNonce: p.previewNonce,
+      choice: p.choice, eventId: event.eventId, answeredAt: now, snapshot };
+    const { wouldCommit } = this.ledger.evaluateAssent(input);
+    const moved = this.apply({ kind: "memoryAssent", choice: p.choice, localRulesPassed: wouldCommit }, out);
+    if (!moved && this.context.state !== "MEMORY_PENDING") {
+      out.push(this.msg({ type: "notice", text: "先回到刚才的卡片，再慢慢选；你的选择还没有提交。" }));
+      return;
+    }
+    const decision = this.assentSink.recordAssent({ ...input, transitionAccepted: moved, stateAfterTransition: this.context.state });
+    if (!moved || (p.choice === "record" && !decision.outcome.committed)) {
+      this.ledger.holdCandidate(this.learnerId, p.candidateId);
+      out.push(this.msg({ type: "notice", text: "这条先不记下来，你不用重新选择。" }));
+      out.push(this.msg({ type: "memoryDismissed", candidateId: p.candidateId, reason: "held" }));
+      if (this.context.state === "MEMORY_PENDING") this.apply({ kind: "memoryHeld" }, out);
+    } else {
+      if (p.choice === "disagree") this.ledger.contest({ learnerId: this.learnerId, target: preview.contestTarget,
+        sessionId: this.deps.sessionId, runId: snapshot.runId, eventId: event.eventId });
+      out.push(this.msg({ type: "memoryDismissed", candidateId: p.candidateId, reason: p.choice === "record" ? "recorded" : p.choice }));
+    }
+    this.memoryPreview = undefined;
+  }
+
   // ---- 工具 ----
   private apply(signal: Signal, out: ChildOutbound[]): boolean {
+    if (this.disposed) return false;
     const before = this.context.state;
     const result = transition(this.context, signal);
     this.context = result.context;
     if (!result.ok) return false;
+    if (signal.kind === "challengeValidated") {
+      this.lastMemoryCandidate = undefined;
+      this.bridgeCandidateRejected = false;
+      this.pendingProbe = undefined;
+      this.recorder.beginRun(this.challenge, this.deps.plugin.manifest.difficultyBands.indexOf(this.challenge.difficultyBand), this.log.lastConfirmedSeq + 1, this.deps.clock());
+      const run = this.recorder.snapshot(this.deps.clock());
+      this.artifactVersionId = `${run.runId}-artifact-v1`;
+      this.ledger.ingestArtifactVersion({ learnerId: this.learnerId, artifactId: `${run.runId}-artifact`, artifactVersionId: this.artifactVersionId,
+        sessionId: this.deps.sessionId, discipline: this.challenge.discipline, versionNo: 1, writer: "host_snapshot",
+        contentRef: `session:${this.deps.sessionId}:run:${run.runId}`, contentHash: createHash("sha256").update(run.runId).digest("hex"), payload: {} });
+      this.recorder.noteArtifactVersion(this.artifactVersionId);
+    }
+    if (this.recorder.started) {
+      if (this.context.assistedRound) this.recorder.noteAssisted();
+      if (signal.kind === "hintIssued") this.recorder.noteHint(signal.level, this.deps.clock());
+      if (signal.kind === "reconstructDone") this.recorder.noteReconstructed();
+      if (this.context.state === "COMPLETED" || (signal.kind === "softLandingChoice" && signal.choice === "simpler")) this.persistRun(this.deps.clock(), true);
+    }
+    if (!["MEMORY_PENDING", "WAITING_CONFIRMATION", "PAUSED_CHILD", "PAUSED_TECH"].includes(this.context.state)) this.memoryPreview = undefined;
     if (this.context.state !== before) {
       out.push(this.msg({ type: "stateChanged", state: this.context.state, hintLevel: this.context.hintLevel, presence: presenceFor(this.context.state) }));
     }
@@ -415,19 +669,32 @@ export class SessionOrchestrator {
 
   private pushTask(text: string, out: ChildOutbound[]): void {
     this.lastLearnerTask = text;
-    out.push(this.msg({ type: "learnerTask", text }));
+    this.lastTaskContestTarget = this.taskContestTarget();
+    out.push(this.msg({ type: "learnerTask", text, contestTarget: this.lastTaskContestTarget }));
+  }
+
+  private taskContestTarget(): { kind: "hypothesis" | "session"; id: string } {
+    const key = this.recorder.started ? this.recorder.activeCandidates()[0]?.hypothesisKey : undefined;
+    return key ? { kind: "hypothesis", id: key } : { kind: "session", id: this.deps.sessionId };
   }
 
   private pushSpeak(text: string, hintLevel: number, out: ChildOutbound[]): void {
     this.lastSpoken = text;
-    out.push(this.msg({ type: "speak", text, hintLevel, interruptible: true }));
+    this.lastSpeakContestTarget = this.lastProposalId ? { kind: "proposal", id: this.lastProposalId } : { kind: "session", id: this.deps.sessionId };
+    out.push(this.msg({ type: "speak", text, hintLevel, interruptible: true, contestTarget: this.lastSpeakContestTarget }));
   }
 
   private runtime(): OrchestratorRuntime {
     return {
       erasedHashes: [...this.erasedHashes], agentObjects: [...this.agentObjects], childObjectIds: [...this.childObjectIds],
       lastProposalId: this.lastProposalId, lastLearnerTask: this.lastLearnerTask, lastSpoken: this.lastSpoken,
+      lastTaskContestTarget: this.lastTaskContestTarget, lastSpeakContestTarget: this.lastSpeakContestTarget,
       windowStartedAt: this.windowStartedAt, lastNewStrategyAt: this.lastNewStrategyAt, outboundCounter: this.outboundCounter,
+      runRecorder: this.recorder.toJSON(), artifactVersionId: this.artifactVersionId,
+      previewNonceCounter: this.previewNonceCounter, memoryPreview: this.memoryPreview,
+      // 自由描述不能进快照；未完成对齐的来源在恢复后保守拒绝，绝不静默改成自建。
+      bridgeCandidateRejected: this.bridgeCandidateRejected || this.lastMemoryCandidate !== undefined,
+      pendingProbe: this.pendingProbe,
     };
   }
 
@@ -437,6 +704,7 @@ export class SessionOrchestrator {
   }
 
   private snapshotIfNeeded(stateChanged: boolean, now: number): void {
+    if (this.disposed) return;
     if (!shouldSnapshot({ stateChanged, eventsSinceSnapshot: this.eventsSinceSnapshot, msSinceSnapshot: now - this.lastSnapshotAt })) return;
     this.snapshotSeq += 1;
     this.deps.store.saveSnapshot(this.deps.sessionId, {

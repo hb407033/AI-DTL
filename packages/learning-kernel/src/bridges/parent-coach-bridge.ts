@@ -13,14 +13,14 @@ export interface ParentInput {
 
 export class ParentCoachBridge implements RealtimeBridge {
   readonly kind = "parent" as const;
-  private waiting: { turn: TurnContext; resolve: (p: TeachingProposal) => void } | null = null;
+  private waiting: { turn: TurnContext; resolve: (p: TeachingProposal) => void; reject: (reason: Error) => void } | null = null;
   private counter = 0;
 
   async start(_sessionId: string): Promise<void> {}
 
   requestProposal(turn: TurnContext): Promise<TeachingProposal> {
     if (this.waiting) throw new Error("上一轮家长输入尚未完成");
-    return new Promise((resolve) => { this.waiting = { turn, resolve }; });
+    return new Promise((resolve, reject) => { this.waiting = { turn, resolve, reject }; });
   }
 
   pending(): TurnContext | null { return this.waiting?.turn ?? null; }
@@ -39,5 +39,5 @@ export class ParentCoachBridge implements RealtimeBridge {
     return proposal;
   }
 
-  async stop(): Promise<void> { this.waiting = null; }
+  async stop(): Promise<void> { const waiting = this.waiting; this.waiting = null; waiting?.reject(new Error("bridgeStopped")); }
 }

@@ -113,3 +113,74 @@ export interface NextVerification {
   dueAt: number;
   expiresAt: number;
 }
+
+export type TrendVerdict = "withdrawing" | "flat" | "rising" | "incomplete" | "insufficient";
+
+export interface GrowthRecord {
+  recordId: string;
+  learnerId: string;
+  tier: 2 | 3;
+  claimKey: string;
+  targetObject: { id: string; label: string };
+  scope: { probeFamilyId: string; difficultyBandIndex: number; surfaceContextKeys: readonly string[] };
+  evidenceLinkIds: readonly string[];
+  counts: DiscreteCounts;
+  lastObservedAt: number;
+  status: JudgementStatus;
+  nextVerification: NextVerification;
+  contests: readonly { contestId: string; at: number; resolvedAt: number | null }[];
+  transferRefs: readonly TransferRef[];
+  maxHintLevelUsedAtAchievement: number;
+  childFacingText: string;
+  evidenceSummaryText: string;
+  hypothesisKeys: readonly string[];
+  trendRef: { windowRunIds: readonly string[]; verdict: TrendVerdict } | null;
+  decisionId: string;
+  committedAt: number;
+  suppressedReason: "deletionRequested" | null;
+}
+
+export interface RuleResult { ruleId: string; passed: boolean; detail: string }
+
+export interface MemoryCommitDecision {
+  decisionId: string;
+  learnerId: string;
+  candidateId: string;
+  tier: 2 | 3;
+  phase: "preflight" | "decide";
+  rulesetId: string;
+  ruleResults: readonly RuleResult[];
+  failures: readonly string[];
+  childChoice: "record" | "unsure" | "disagree" | null;
+  parentReviewId: string | null;
+  assistedRound: boolean;
+  outcome: { committed: boolean; recordId: string | null; reasonCode: string | null };
+  decidedBy: "GrowthLedgerService";
+  decidedAt: number;
+}
+
+export type CandidateStatus = "awaiting_parent" | "awaiting_child" | "awaiting_reassent" | "held" |
+  "declined_unsure" | "contested" | "committed" | "superseded";
+
+export interface MemoryCandidate {
+  candidateId: string;
+  learnerId: string;
+  tier: 2 | 3;
+  claimKey: string;
+  targetObject: GrowthRecord["targetObject"];
+  scope: GrowthRecord["scope"];
+  counts: DiscreteCounts;
+  evidenceLinkIds: readonly string[];
+  hypothesisKeys: readonly string[];
+  transferRefs: readonly TransferRef[];
+  maxHintLevelUsedAtAchievement: number;
+  nextVerification: NextVerification;
+  childFacingText: string;
+  evidenceSummaryText: string;
+  contestTarget: ContestTarget;
+  proposedBy: "bridge" | "kernel" | "bridge+kernel";
+  previewNonce: string | null;
+  shownAt: number | null;
+  status: CandidateStatus;
+  createdAt: number;
+}

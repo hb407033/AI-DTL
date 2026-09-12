@@ -39,7 +39,7 @@ final class SessionProtocolTests: XCTestCase {
     func testOutboundDecodesAllSevenKinds() throws {
         let fixture = try loadFixture()
         XCTAssertEqual(fixture.outbound.count, 7)
-        guard case .speak(_, let text, let level, _) = fixture.outbound[0] else { return XCTFail("第一条应是 speak") }
+        guard case .speak(_, let text, let level, _, _) = fixture.outbound[0] else { return XCTFail("第一条应是 speak") }
         XCTAssertEqual(text, "你现在已经确定了什么？")
         XCTAssertEqual(level, 1)
         guard case .canvasAction(_, .highlight(let objectId)) = fixture.outbound[1] else { return XCTFail("第二条应是 highlight") }
