@@ -4,6 +4,7 @@ import SwiftUI
 
 struct ChildSessionView: View {
     @State private var client = SessionClient()
+    @State private var drawing = DrawingArchive()
     @State private var voice = AgentVoice()
     @State private var draft = ""
     @State private var draftKind: DraftKind = .thought
@@ -37,10 +38,11 @@ struct ChildSessionView: View {
             }
             Divider()
             ZStack {
-                ChildCanvasView(clearToken: clearToken) { events in
+                ChildCanvasView(clearToken: clearToken, restored: drawing.restored, restoreToken: drawing.restoreToken, onDrawing: drawing.changed) { events in
                     childActed()
                     for event in events { client.send(event, source: .childTouch) }
                 }
+                .allowsHitTesting(!drawing.isDeleted)
                 AgentLayerView(objects: client.view.agentObjects, highlightedIds: client.view.highlightedIds, pointer: client.view.pointer)
                 if let preview = client.view.memoryPreview, !client.view.isPaused, firstUseNotice?.acknowledged == true {
                     MemoryPreviewCard(preview: preview, act: act)
@@ -52,11 +54,16 @@ struct ChildSessionView: View {
             }
             Divider()
             agentBubble
+            if !drawing.status.isEmpty {
+                HStack { Text(drawing.status).font(.caption); Button("重试保存") { drawing.reconnect() } }.padding(.horizontal)
+            }
             inputBar
             controlBar
         }
         .background(Color(.systemBackground))
         .onAppear { client.connect(); breathing = true }
+        .task(id: client.sessionId) { drawing.configure(host: client.host, sessionId: client.sessionId); if client.isConnected { drawing.reconnect() } }
+        .onChange(of: client.isConnected) { _, connected in if connected { drawing.configure(host: client.host, sessionId: client.sessionId); drawing.reconnect() } }
         .task(id: client.host) { await loadFirstUse() }
         .sheet(isPresented: $showUnderstanding) {
             if let ledger = ledgerClient { ChildUnderstandingView(client: ledger) }
@@ -99,7 +106,10 @@ struct ChildSessionView: View {
                 .accessibilityIdentifier("openChildUnderstanding")
             Button("清空笔迹", role: .destructive) { clearToken += 1 }
                 .font(.caption)
-            Button("换一题") { clearToken += 1; client.startNewSession() }
+            Button("换一题") {
+                client.startNewSession()
+                drawing.configure(host: client.host, sessionId: client.sessionId)
+            }
                 .font(.caption)
         }
         .padding(.horizontal, 20)

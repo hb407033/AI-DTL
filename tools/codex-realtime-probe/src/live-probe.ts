@@ -1,19 +1,19 @@
 // 真实 Codex realtime 探针：以 ChatGPT 登录身份，通过本机 codex app-server 连续开 N 个 realtime 会话，
-// 每个会话用 appendText 触发一句固定回复，测 appendText → 首个 outputAudio/delta 的耗时（Mac 侧诊断口径，不是 iPad 端到端）。
+// 用固定文字或显式确认的成人/合成 WAV，测首个输入 → 首个 outputAudio/delta（Mac 侧诊断，不是 iPad 端到端）。
 // 准入：codex 版本与 schema 哈希须与契约一致；OPENAI_API_KEY 不得存在；account 必须是 chatgpt；否则 BLOCKED。
 // 阶段 0 所有送入 Codex 的输入只用固定文本或家长/合成音，不用孩子的任何声音与文字。
 import { execFile } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { summarizeMetrics, type MetricSample } from "@ai-scholar/gate-contracts";
 import { AppServerClient } from "./app-server-client.js";
+import { parseProbeWav, audioChunks, readAudioFileArgument } from "./audio-input.js";
+import { runRealtimeTrial, type TrialInput } from "./realtime-trial.js";
 import {
   CODEX_VERSION, V2_SCHEMA_SHA256, REALTIME_METHODS, REALTIME_NOTIFICATIONS,
   getAccountResponseSchema, getAccountRateLimitsResponseSchema, threadStartResponseSchema,
-  realtimeStartedSchema, outputAudioDeltaSchema, transcriptDoneSchema, realtimeErrorSchema,
-  type ThreadRealtimeStartParams, type ThreadRealtimeAppendTextParams,
 } from "./realtime-contract.js";
 
 const execFileAsync = promisify(execFile);
@@ -30,6 +30,7 @@ interface Trial {
 
 interface ProbeResult {
   schemaVersion: 1;
+  scope: "mac-text-first-audio" | "mac-audio-first-audio" | "handshake-only";
   runId: string;
   status: "PASS" | "FAIL" | "BLOCKED";
   blockedReason?: string;
@@ -61,13 +62,33 @@ function maskEmail(email: string | null | undefined): string | null {
 async function main() {
   const trialsWanted = Number(arg("--trials", "20"));
   const dryRun = process.argv.includes("--dry-run");
+  let audioFile = "";
   const runId = new Date().toISOString().replace(/[:.]/g, "-");
   const outDir = join(repoRoot, "validation", "results", "codex");
   const result: ProbeResult = {
     schemaVersion: 1, runId, status: "BLOCKED", codexVersion: "", v2SchemaSha256: "", realtimeConversationFeature: "",
+    scope: dryRun ? "handshake-only" : process.argv.includes("--audio-file") ? "mac-audio-first-audio" : "mac-text-first-audio",
     trials: [], usageAttribution: "unverified", realtimeNotifications: [], notes: [],
   };
-  const finish = async (status: ProbeResult["status"], blockedReason?: string) => {
+
+  try { audioFile = readAudioFileArgument(process.argv); }
+  catch (error) { await finish("BLOCKED", error instanceof Error ? error.message : String(error)); return; }
+  if (!Number.isInteger(trialsWanted) || trialsWanted < 1 || trialsWanted > 20) {
+    await finish("BLOCKED", "--trials 必须是 1–20 的整数"); return;
+  }
+  let input: TrialInput = { kind: "text", text: "请只说：你好，我们开始验证。" };
+  if (audioFile && !dryRun) {
+    if (!process.argv.includes("--confirm-adult-audio")) {
+      await finish("BLOCKED", "音频仅限成人/合成固定测试内容，须提供 --confirm-adult-audio；禁止儿童录音"); return;
+    }
+    try {
+      if ((await stat(audioFile)).size > 2_000_000) throw new Error("WAV file too large");
+      const pcm = parseProbeWav(await readFile(audioFile));
+      input = { kind: "audio", chunks: audioChunks(pcm) };
+      result.notes.push(`固定 PCM 输入 ${pcm.length / 48} ms，尾部静音 1500 ms；延迟从首个输入块发送起计，不是说完到首音频或 iPad 指标`);
+    } catch (error) { await finish("BLOCKED", `invalid audio input: ${error instanceof Error ? error.message : error}`); return; }
+  }
+  async function finish(status: ProbeResult["status"], blockedReason?: string) {
     result.status = status;
     if (blockedReason) result.blockedReason = blockedReason;
     await mkdir(outDir, { recursive: true });
@@ -117,54 +138,23 @@ async function main() {
     result.account = { type: "chatgpt", planType: account.account.planType, emailMasked: maskEmail(account.account.email) };
     result.rateLimitsBefore = getAccountRateLimitsResponseSchema.parse(await client.request("account/rateLimits/read", {})).rateLimits ?? null;
 
-    const thread = threadStartResponseSchema.parse(await client.request("thread/start", { ephemeral: true }, { timeoutMs: 30_000 }));
-    const threadId = thread.thread.id;
-    result.notes.push(`threadId=${threadId}`);
-
     result.voices = await client.request(REALTIME_METHODS.listVoices, {});
     if (dryRun) {
-      await finish("PASS");
+      await finish("BLOCKED", "仅握手检查完成，未启动实时音频，不能判语音门禁通过");
       return;
     }
 
     // 4. 连续会话
     for (let index = 1; index <= trialsWanted; index++) {
-      const trial: Trial = { index, ok: false };
+      // 每回合独立线程，上一回合晚到的 closed/audio 不能污染下一回合。
+      const thread = threadStartResponseSchema.parse(await client.request("thread/start", { ephemeral: true }, { timeoutMs: 30_000 }));
+      const threadId = thread.thread.id;
+      const outcome = await runRealtimeTrial(client, threadId, input);
+      const trial: Trial = { index, ...outcome };
       result.trials.push(trial);
-      try {
-        const errorNotice = client.waitForNotification(REALTIME_NOTIFICATIONS.error, 40_000).then((p) => realtimeErrorSchema.parse(p)).catch(() => null);
-        const errorRace = errorNotice.then((e) => (e ? { kind: "error" as const, params: e } : new Promise<never>(() => {})));
-        const started = client.waitForNotification(REALTIME_NOTIFICATIONS.started, 15_000).then((p) => ({ kind: "started" as const, params: p }));
-        const t0 = performance.now();
-        const startParams: ThreadRealtimeStartParams = { threadId, outputModality: "audio", transport: { type: "websocket" } };
-        await client.request(REALTIME_METHODS.start, startParams, { timeoutMs: 15_000 });
-        const startOutcome = await Promise.race([started, errorRace]);
-        if (startOutcome.kind === "error") throw new Error(`realtime error（start 阶段）: ${startOutcome.params.message}`);
-        realtimeStartedSchema.parse(startOutcome.params);
-        trial.startToStartedMs = Math.round(performance.now() - t0);
-
-        const firstAudio = client.waitForNotification(REALTIME_NOTIFICATIONS.outputAudioDelta, 15_000);
-        const transcriptDone = client.waitForNotification(REALTIME_NOTIFICATIONS.transcriptDone, 20_000).catch(() => null);
-        const t1 = performance.now();
-        const appendParams: ThreadRealtimeAppendTextParams = { threadId, text: "请只说：你好，我们开始验证。" };
-        await client.request(REALTIME_METHODS.appendText, appendParams, { timeoutMs: 15_000 });
-        const winner = await Promise.race([
-          firstAudio.then((p) => ({ kind: "audio" as const, params: p })),
-          errorRace,
-        ]);
-        if (winner.kind === "error") throw new Error(`realtime error: ${winner.params.message}`);
-        outputAudioDeltaSchema.parse(winner.params);
-        trial.appendToFirstAudioMs = Math.round(performance.now() - t1);
-        const done = await transcriptDone;
-        if (done) trial.transcript = transcriptDoneSchema.parse(done).text;
-        trial.ok = true;
-      } catch (error) {
-        trial.error = error instanceof Error ? error.message : String(error);
-      } finally {
-        await client.request(REALTIME_METHODS.stop, { threadId }, { timeoutMs: 10_000 }).catch((e) => { trial.error = (trial.error ?? "") + ` | stop: ${e instanceof Error ? e.message : e}`; });
-        await client.waitForNotification(REALTIME_NOTIFICATIONS.closed, 5_000).catch(() => null);
-      }
       console.log(`会话 ${index}/${trialsWanted}: ${trial.ok ? "OK" : "FAIL"} 首音频 ${trial.appendToFirstAudioMs ?? "-"} ms ${trial.error ?? ""}`);
+      // 相同鉴权错误不会因重复 20 次而改善，立即结束，不尝试其他身份。
+      if (outcome.blocked) break;
     }
 
     result.rateLimitsAfter = getAccountRateLimitsResponseSchema.parse(await client.request("account/rateLimits/read", {})).rateLimits ?? null;

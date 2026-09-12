@@ -80,9 +80,16 @@
       review.hypotheses.forEach(h => text(box, `${h.parentFacingLabel} · ${h.status} · 支持题目 ${h.counts.supportingChallenges} · 反驳题目 ${h.counts.refutingChallenges} · 不同情境 ${h.counts.distinctSurfaceContexts} · 独立迁移 ${h.counts.independentTransferSuccesses} · 提示后成功 ${h.counts.hintedSuccesses}${h.stopsDrivingPersonalization ? " · 已冻结" : ""}`));
       review.artifactLinks.forEach(link => {
         const details = document.createElement("details"), summary = document.createElement("summary");
-        summary.textContent = `查看作品 ${link.artifactId} 的原始事件证据 JSON`; details.append(summary); box.append(details);
+        summary.textContent = `查看作品 ${link.artifactId} 的笔迹和原始证据`; details.append(summary); box.append(details);
         details.ontoggle = async () => { if (!details.open || details.childElementCount > 1) return; try {
           const evidence = await api(link.href); text(details, evidence.previewReason);
+          if (evidence.previewAvailable) {
+            const response = await fetch(`${link.href}/drawing-preview`, { headers: { "X-Parent-Token": token }, cache: "no-store" });
+            if (!response.ok) throw new Error("笔迹预览暂时无法打开");
+            const image = document.createElement("img"), imageURL = URL.createObjectURL(await response.blob());
+            image.alt = "孩子原始笔迹预览"; image.style.maxWidth = "100%";
+            image.onload = image.onerror = () => URL.revokeObjectURL(imageURL); image.src = imageURL; details.append(image);
+          }
           const pre = document.createElement("pre"); pre.style.whiteSpace = "pre-wrap"; pre.style.overflowWrap = "anywhere"; pre.textContent = JSON.stringify(evidence, null, 2); details.append(pre);
         } catch (e) { text(details, e.message); } };
       });

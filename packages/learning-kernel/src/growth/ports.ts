@@ -84,7 +84,7 @@ export interface GrowthParentPort {
     childFacingText: string; blocked: readonly string[];
   }[];
   artifactEvidence(learnerId: string, artifactId: string): {
-    artifactId: string; sessionId: string; previewAvailable: false; previewReason: string;
+    artifactId: string; sessionId: string; previewAvailable: boolean; previewReason: string;
     versions: readonly Record<string, unknown>[]; events: readonly unknown[];
   } | null;
   records(learnerId: string): readonly GrowthRecord[];

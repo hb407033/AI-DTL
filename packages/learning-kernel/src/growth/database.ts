@@ -64,6 +64,9 @@ export function createGrowthTables(db: LearningDatabase): void {
       content_ref TEXT NOT NULL, content_hash TEXT NOT NULL, created_at INTEGER NOT NULL,
       written_by TEXT NOT NULL CHECK (written_by = 'GrowthLedgerService'),
       UNIQUE (artifact_id, version_no));
+    CREATE TABLE IF NOT EXISTS drawing_blobs (
+      artifact_version_id TEXT PRIMARY KEY REFERENCES artifact_versions(artifact_version_id) ON DELETE CASCADE,
+      revision TEXT NOT NULL, drawing BLOB NOT NULL, preview BLOB NOT NULL);
 
     -- ══ run、链接、假设 ══
     CREATE TABLE IF NOT EXISTS challenge_runs (

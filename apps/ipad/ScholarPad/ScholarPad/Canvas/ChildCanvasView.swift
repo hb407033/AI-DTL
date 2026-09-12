@@ -7,6 +7,9 @@ import UIKit
 struct ChildCanvasView: UIViewRepresentable {
     /// 外部把它 +1 就清空笔迹；用计数而不是布尔，避免同一值触发不了 updateUIView。
     let clearToken: Int
+    var restored: Data? = nil
+    var restoreToken: Int = 0
+    var onDrawing: @MainActor (PKDrawing) -> Void = { _ in }
     let onEvents: @MainActor ([EventPayload]) -> Void
 
     func makeUIView(context: Context) -> PKCanvasView {
@@ -25,26 +28,49 @@ struct ChildCanvasView: UIViewRepresentable {
     }
 
     func updateUIView(_ canvas: PKCanvasView, context: Context) {
+        if context.coordinator.lastRestoreToken != restoreToken, let restored, let drawing = try? PKDrawing(data: restored) {
+            context.coordinator.lastRestoreToken = restoreToken
+            context.coordinator.restore(drawing, into: canvas)
+        }
         if context.coordinator.lastClearToken != clearToken {
             context.coordinator.lastClearToken = clearToken
-            canvas.drawing = PKDrawing()
+            context.coordinator.clearByChild(canvas)
         }
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator(clearToken: clearToken, onEvents: onEvents) }
+    func makeCoordinator() -> Coordinator { Coordinator(clearToken: clearToken, onEvents: onEvents, onDrawing: onDrawing) }
 
     @MainActor
     final class Coordinator: NSObject, PKCanvasViewDelegate {
         var lastClearToken: Int
+        var lastRestoreToken = -1
+        private var lastData: Data?
         private var known: Set<String> = []
         private let onEvents: @MainActor ([EventPayload]) -> Void
+        private let onDrawing: @MainActor (PKDrawing) -> Void
 
-        init(clearToken: Int, onEvents: @escaping @MainActor ([EventPayload]) -> Void) {
+        init(clearToken: Int, onEvents: @escaping @MainActor ([EventPayload]) -> Void, onDrawing: @escaping @MainActor (PKDrawing) -> Void) {
             self.lastClearToken = clearToken
             self.onEvents = onEvents
+            self.onDrawing = onDrawing
+        }
+
+        func restore(_ drawing: PKDrawing, into canvas: PKCanvasView) {
+            known = Set(drawing.strokes.map { StrokeDiff.quantizedHash(points: $0.path.map(\.location)) })
+            lastData = drawing.dataRepresentation()
+            canvas.drawing = drawing
+        }
+
+        func clearByChild(_ canvas: PKCanvasView) {
+            canvas.drawing = PKDrawing()
+            canvasViewDrawingDidChange(canvas)
         }
 
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
+            let data = canvasView.drawing.dataRepresentation()
+            guard data != lastData else { return }
+            lastData = data
+            onDrawing(canvasView.drawing)
             let strokes = canvasView.drawing.strokes.map { stroke in
                 let bounds = stroke.renderBounds
                 return StrokeDiff.Stroke(

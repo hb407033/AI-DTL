@@ -14,6 +14,7 @@ import { canvasActionSchema } from "@ai-scholar/session-contracts";
 import { createSessionHost } from "./session-gateway.js";
 import { CHILD_LISTEN, PARENT_LISTEN, createParentChannel, loadParentToken } from "./parent-channel.js";
 import { registerGrowthRoutes } from "./growth-routes.js";
+import { registerDrawingRoutes } from "./drawing-routes.js";
 import { startRetentionJob } from "./retention-job.js";
 export { CHILD_LISTEN, PARENT_LISTEN } from "./parent-channel.js";
 
@@ -55,6 +56,7 @@ export async function buildHostServers(options: HostServerOptions) {
   const clock = options.clock ?? (() => Date.now());
   const ledger = db ? GrowthLedgerService.open({ db, clock }) : null;
   if (ledger) registerGrowthRoutes(app, parentApp, ledger);
+  if (ledger) registerDrawingRoutes(app, parentApp, ledger);
   const stopRetention = ledger ? startRetentionJob({ sweepRetention: now => ledger.sweepRetention(now), clock, ...(options.retentionIntervalMs === undefined ? {} : { intervalMs: options.retentionIntervalMs }), onError: error => app.log.error({ err: error }, "成长记录保留期巡检失败") }) : () => {};
   const host = createSessionHost({
     plugin: mathPlugin, store, clock,

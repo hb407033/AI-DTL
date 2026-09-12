@@ -32,6 +32,36 @@ export class GrowthLedgerService {
     return new GrowthLedgerService(input.db, input.clock);
   }
   close(): void { this.db.close(); }
+  /** 原笔迹专用端口，绝不交给教学 Agent。服务端从会话选择唯一稳定的画布作品。 */
+  drawingPort() {
+    const binding = (learnerId: string, sessionId: string) => {
+      if (this.sessionDeleted(sessionId) || this.db.prepare("SELECT 1 FROM ledger_audit a JOIN artifacts b ON a.subject_id=b.artifact_id WHERE b.session_id=? AND a.reason_code='artifact_deleted'").get(sessionId)) throw new Error("drawingDeleted");
+      const row = this.db.prepare("SELECT a.artifact_id FROM artifacts a WHERE learner_id=? AND session_id=? ORDER BY EXISTS(SELECT 1 FROM artifact_versions v JOIN drawing_blobs b USING(artifact_version_id) WHERE v.artifact_id=a.artifact_id) DESC,created_at,artifact_id LIMIT 1").get(learnerId, sessionId);
+      if (!row) throw new Error("drawingNotFound");
+      return String(row.artifact_id);
+    };
+    const latest = (artifactId: string) => this.db.prepare("SELECT v.artifact_id,v.artifact_version_id,v.version_no,b.revision,b.drawing,b.preview FROM artifact_versions v JOIN drawing_blobs b USING(artifact_version_id) WHERE artifact_id=? ORDER BY version_no DESC LIMIT 1").get(artifactId);
+    const serialize = (row: NonNullable<ReturnType<typeof latest>>) => ({ artifactId: String(row.artifact_id), artifactVersionId: String(row.artifact_version_id), versionNo: Number(row.version_no), revision: String(row.revision), drawing: Buffer.from(row.drawing as Uint8Array).toString("base64"), preview: Buffer.from(row.preview as Uint8Array).toString("base64") });
+    return {
+      restore: (learnerId: string, sessionId: string) => { const row = latest(binding(learnerId, sessionId)); return row ? serialize(row) : null; },
+      preview: (learnerId: string, artifactId: string) => {
+        if (!this.db.prepare("SELECT 1 FROM artifacts WHERE learner_id=? AND artifact_id=?").get(learnerId, artifactId)) return null;
+        const row = latest(artifactId); return row ? Buffer.from(row.preview as Uint8Array) : null;
+      },
+      save: (learnerId: string, sessionId: string, revision: string, drawing: Buffer, preview: Buffer) => this.#store.transaction(() => {
+        const artifactId = binding(learnerId, sessionId), versionId = idOf("drawing", artifactId, revision);
+        const hash = createHash("sha256").update(`${drawing.length}:${preview.length}:`).update(drawing).update(preview).digest("hex");
+        const existing = this.db.prepare("SELECT content_hash,version_no FROM artifact_versions WHERE artifact_version_id=?").get(versionId);
+        if (existing && existing.content_hash !== hash) throw new Error("drawingRevisionConflict");
+        const versionNo = existing ? Number(existing.version_no) : Number(this.db.prepare("SELECT MAX(version_no) AS n FROM artifact_versions WHERE artifact_id=?").get(artifactId)?.n ?? 0) + 1;
+        if (!existing) {
+          this.db.prepare("INSERT INTO artifact_versions VALUES (?,?,?,?,?,?,?,?)").run(versionId, artifactId, versionNo, "child_upload", `sqlite-drawing:${versionId}`, hash, this.clock(), "GrowthLedgerService");
+          this.db.prepare("INSERT INTO drawing_blobs VALUES (?,?,?,?)").run(versionId, revision, drawing, preview);
+        }
+        return { artifactId, artifactVersionId: versionId, versionNo, revision };
+      }),
+    };
+  }
   onDeletion(listener: (sessionIds: readonly string[]) => void): () => void { this.deletionListeners.add(listener); return () => this.deletionListeners.delete(listener); }
 
   sessionPort(): GrowthSessionPort {
@@ -177,8 +207,9 @@ export class GrowthLedgerService {
         const artifact = this.db.prepare("SELECT session_id FROM artifacts WHERE learner_id=? AND artifact_id=?").get(learnerId, artifactId);
         if (!artifact) return null;
         const sessionId = String(artifact.session_id);
-        return { artifactId, sessionId, previewAvailable: false as const,
-          previewReason: "未保存可渲染的 PKDrawing 原始内容，无法预览笔迹；以下为实际保存的事件证据与版本元数据。",
+        const previewAvailable = !!this.drawingPort().preview(learnerId, artifactId);
+        return { artifactId, sessionId, previewAvailable,
+          previewReason: previewAvailable ? "以下预览来自孩子原始笔迹，不含 Agent 图层。" : "未保存可渲染的 PKDrawing 原始内容，无法预览笔迹；以下为实际保存的事件证据与版本元数据。",
           versions: this.db.prepare("SELECT artifact_version_id,version_no,writer,content_ref,content_hash,created_at FROM artifact_versions WHERE artifact_id=? ORDER BY version_no").all(artifactId),
           events: this.db.prepare("SELECT event_json FROM events WHERE session_id=? ORDER BY server_seq").all(sessionId).map(row => JSON.parse(String(row.event_json)) as unknown) };
       },
@@ -480,8 +511,10 @@ export class GrowthLedgerService {
   private deletionInput(learnerId: string, subject: DeletionInput["subject"]): DeletionInput {
     const runs = this.#store.runs(learnerId), records = this.#store.records(learnerId);
     const sessions = new Set(runs.map(run => run.sessionId));
-    const artifactVersions = this.db.prepare("SELECT v.*,a.learner_id FROM artifact_versions v JOIN artifacts a USING(artifact_id) WHERE learner_id=?").all(learnerId)
-      .map(row => ({ artifactId: String(row.artifact_id), artifactVersionId: String(row.artifact_version_id), contentRef: String(row.content_ref) }));
+    const targetSession = subject.kind === "artifact" ? this.db.prepare("SELECT session_id FROM artifacts WHERE learner_id=? AND artifact_id=?").get(learnerId, subject.id)?.session_id : undefined;
+    // 全会话画布不可按 run 分割。删除其中任一作品时，把共享原画布也纳入同一预览和事务；不改变持久归属。
+    const artifactVersions = this.db.prepare("SELECT v.*,a.learner_id,a.session_id FROM artifact_versions v JOIN artifacts a USING(artifact_id) WHERE learner_id=?").all(learnerId)
+      .map(row => ({ artifactId: targetSession !== undefined && row.session_id === targetSession && String(row.content_ref).startsWith("sqlite-drawing:") ? subject.id : String(row.artifact_id), artifactVersionId: String(row.artifact_version_id), contentRef: String(row.content_ref) }));
     const decisions = this.db.prepare("SELECT decision_id,source_link_ids_json,source_run_ids_json FROM memory_decisions WHERE learner_id=?").all(learnerId)
       .flatMap(row => { const decision = this.#store.decision(String(row.decision_id)); return decision ? [{ ...decision, sourceLinkIds: JSON.parse(String(row.source_link_ids_json)) as string[], sourceRunIds: JSON.parse(String(row.source_run_ids_json)) as string[] }] : []; });
     const candidates = this.#store.candidates(learnerId), candidateIds = new Set(candidates.map(candidate => candidate.candidateId));
@@ -583,7 +616,7 @@ export class GrowthLedgerService {
     this.requireDeletionSubject(learnerId, subject);
     const plan = planDeletionCascade(this.deletionInput(learnerId, subject));
     if (JSON.stringify(plan.audit.counts) !== JSON.stringify(expected)) throw new Error("parent.deletionPreviewStale");
-    if (plan.removeContentRefs.some(ref => !ref.startsWith("session:"))) throw new Error("externalArtifactDeletionNotConfigured");
+    if (plan.removeContentRefs.some(ref => !ref.startsWith("session:") && !ref.startsWith("sqlite-drawing:"))) throw new Error("externalArtifactDeletionNotConfigured");
     const sessions = [...new Set(plan.redactSnapshotKeys.map(key => key.sessionId))];
     this.#store.transaction(() => {
       // 当前运行时也持有原内容。删除后这个会话只读，继续学习须建立新会话。
