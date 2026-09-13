@@ -277,7 +277,7 @@ struct ProbeDashboardView: View {
         NavigationStack {
             Text("原生 iPad 门禁")
                 .font(.largeTitle.bold())
-                .navigationTitle("ScholarPad Probe")
+                .navigationTitle("AI-DTL 联调")
         }
     }
 }
@@ -824,7 +824,7 @@ Expected: 第一条输出以 `/tools/codex-realtime-probe` 结尾，两条命令
   "params": {
     "clientInfo": {
       "name": "ai_scholar_probe",
-      "title": "AI Scholar Probe",
+      "title": "AI-DTL Probe",
       "version": "0.1.0"
     },
     "capabilities": {

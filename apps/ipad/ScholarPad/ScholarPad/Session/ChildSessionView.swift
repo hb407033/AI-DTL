@@ -91,6 +91,7 @@ struct ChildSessionView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
+            BrandLogoView()
             Circle()
                 .fill(client.isConnected ? Color.green.opacity(0.7) : Color.gray.opacity(0.4))
                 .frame(width: 14, height: 14)

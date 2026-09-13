@@ -127,7 +127,7 @@ async function main() {
     result.realtimeNotifications.push({ method, params: slim, atMs: Math.round(performance.now() - startedAt) });
   });
   try {
-    const init = await client.initialize({ name: "ai_scholar_probe", title: "AI Scholar Probe", version: "0.1.0" });
+    const init = await client.initialize({ name: "ai_scholar_probe", title: "AI-DTL Probe", version: "0.1.0" });
     result.notes.push(`userAgent=${init.userAgent ?? "?"}`);
 
     const account = getAccountResponseSchema.parse(await client.request("account/read", {}));

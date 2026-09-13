@@ -11,7 +11,7 @@ async function spawnClient(options: { experimentalApi?: boolean } = {}) {
 describe("AppServerClient（stdio JSON-RPC）", () => {
   test("握手：initialize 声明 experimentalApi，收到响应后才发 initialized", async () => {
     const client = await spawnClient();
-    const init = await client.initialize({ name: "ai_scholar_probe", title: "AI Scholar Probe", version: "0.1.0" });
+    const init = await client.initialize({ name: "ai_scholar_probe", title: "AI-DTL Probe", version: "0.1.0" });
     expect(init.userAgent).toBe("fake-app-server/0.0.0");
     const { received } = await client.request<{ received: string[] }>("debug/received", {});
     expect(received.slice(0, 2)).toEqual(["initialize", "initialized"]);

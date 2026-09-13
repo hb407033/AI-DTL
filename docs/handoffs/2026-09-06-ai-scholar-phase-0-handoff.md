@@ -79,7 +79,7 @@
 最小握手：
 
 ```json
-{"method":"initialize","id":1,"params":{"clientInfo":{"name":"ai_scholar_probe","title":"AI Scholar Probe","version":"0.1.0"},"capabilities":{"experimentalApi":true}}}
+{"method":"initialize","id":1,"params":{"clientInfo":{"name":"ai_scholar_probe","title":"AI-DTL Probe","version":"0.1.0"},"capabilities":{"experimentalApi":true}}}
 {"method":"initialized","params":{}}
 {"method":"thread/realtime/listVoices","id":2,"params":{}}
 ```
@@ -271,4 +271,3 @@ NSAppTransportSecurity:
 - 仍未开始：iPad 儿童端会话界面（可先在模拟器做）、`CodexRealtimeBridge`（待路线裁决）、长期记忆写入与断线恢复（阶段 2）。
 - 同日下午：儿童端 App `apps/ipad/ScholarPad`（独立于探针工程）在模拟器跑通——协议类型按契约夹具对齐、出站幂等队列、笔画差分、界面状态 reducer、WebSocket 客户端、PencilKit 画布 + Agent 语义层 + 说话输入 + 四个常驻按钮；单测 17 个、UI 冒烟 1 条（连本机脚本回放宿主）通过。语音仍用文字代替，Pencil 与真机待设备。
 - 同日傍晚：会话恢复完成——儿童端断线即 `PAUSED_TECH`（停计时、停判断），重连回原状态并收到“当前画面”；宿主重启从最新快照 + 后续事件重建，旧事件重放仍返回原 ack；儿童端把 sessionId 存本地，重开 App 续接（“换一题”另起会话）。计划见 `docs/superpowers/plans/2026-09-06-ai-scholar-phase-2-session-recovery.md`。
-

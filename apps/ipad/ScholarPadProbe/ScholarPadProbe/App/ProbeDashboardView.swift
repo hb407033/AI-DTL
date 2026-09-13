@@ -35,6 +35,15 @@ struct ProbeDashboardView: View {
     private var canvasTab: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                HStack(spacing: 16) {
+                    BrandLogoView()
+                    Text("AI-Powered System for Disciplinary Thinking and Learning")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 4)
                 statsBar
                 Divider()
                 ZStack {
@@ -42,7 +51,8 @@ struct ProbeDashboardView: View {
                     SemanticOverlayView(scene: canvas.scene)
                 }
             }
-            .navigationTitle("ScholarPad Probe")
+            .navigationTitle("AI-DTL 联调")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     // 两个清空是两个动作：语义层与笔迹层永远分开

@@ -64,7 +64,10 @@ export async function buildHostServers(options: HostServerOptions) {
     makeBridge: (sessionId) => (options.bridge === "parent" ? host.parentBridge(sessionId) : new ScriptedReplayBridge(options.script ?? { scriptVersion: 1, turns: [] })),
   });
   const detachDeletion = ledger?.onDeletion(ids => host.invalidate(ids));
-  const consoleHtml = readFileSync(new URL("./parent-console.html", import.meta.url), "utf8");
+  // 静态品牌随页面内嵌，不新增免鉴权资源路由，也不向外网请求素材。
+  const brandLogo = readFileSync(new URL("../../../assets/brand/ai-dtl-logo.png", import.meta.url));
+  const consoleHtml = readFileSync(new URL("./parent-console.html", import.meta.url), "utf8")
+    .replace("__AI_DTL_LOGO_DATA_URI__", `data:image/png;base64,${brandLogo.toString("base64")}`);
 
   app.get("/healthz", async () => ({ status: "ok", bridge: options.bridge }));
   app.get("/child/first-use", async () => ({ text: FIRST_USE_NOTICE, acknowledged: ledger?.childPort().firstUseAcknowledged("child-1") ?? false }));

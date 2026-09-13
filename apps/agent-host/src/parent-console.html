@@ -4,9 +4,16 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8" />
-<title>家长控制台</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0056c9" />
+<title>AI-DTL · 家长控制台</title>
 <style>
   body { font-family: -apple-system, "PingFang SC", sans-serif; margin: 2rem; max-width: 720px; }
+  .brand { border-bottom: 2px solid #00a8a5; padding-bottom: 1rem; }
+  .brand img { display: block; width: 300px; max-width: 100%; height: auto; }
+  .brand-name { margin: .25rem 0; font-size: 1.2rem; font-weight: 600; color: #004aa8; }
+  .brand-english { margin: .5rem 0; font-size: .8rem; line-height: 1.5; color: #52616b; }
+  .brand-principle { margin-bottom: 0; font-size: .9rem; line-height: 1.6; }
   .state { font-size: 1.4rem; font-weight: 600; }
   .pending { background: #fff4d6; padding: 1rem; border-radius: 8px; margin: 1rem 0; }
   label { display: block; margin-top: .6rem; }
@@ -19,6 +26,12 @@
 </style>
 </head>
 <body>
+<header class="brand">
+  <img src="__AI_DTL_LOGO_DATA_URI__" alt="AI-DTL" width="2172" height="724" />
+  <p class="brand-name">AI 学科心智学习系统</p>
+  <p class="brand-english" lang="en">AI-Powered System for Disciplinary Thinking and Learning</p>
+  <p class="brand-principle">孩子先独立建模，AI 根据证据逐级介入，并最终退出。</p>
+</header>
 <h1>家长控制台</h1>
 <label>家长访问凭据（仅保留在本页内存）<input id="token" type="password" autocomplete="off" /></label>
 <button id="connect">连接</button><p id="connection"></p>

@@ -44,7 +44,7 @@ codex app-server --enable realtime_conversation --stdio
   "params": {
     "clientInfo": {
       "name": "ai_scholar_probe",
-      "title": "AI Scholar Probe",
+      "title": "AI-DTL Probe",
       "version": "0.1.0"
     },
     "capabilities": {

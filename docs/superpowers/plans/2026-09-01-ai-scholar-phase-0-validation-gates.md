@@ -994,7 +994,7 @@ Expected: FAIL，提示找不到 `app-server-client.js`。
 
 - 使用 `spawn`，参数数组传递，禁止 `shell: true`；
 - 只向子进程 stdin 写 JSON-RPC，每条消息以换行结束；
-- `initialize` 参数固定为 `clientInfo: { name: "ai-scholar-gate", title: "AI Scholar Gate", version: "0.1.0" }`；
+- `initialize` 参数固定为 `clientInfo: { name: "ai-scholar-gate", title: "AI-DTL Gate", version: "0.1.0" }`；
 - 初始化响应后发送 `{"method":"initialized"}`；
 - 请求用单调递增整数 id；
 - stderr 单独收集但不解析为协议；

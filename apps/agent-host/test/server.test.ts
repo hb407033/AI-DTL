@@ -1,6 +1,7 @@
 // apps/agent-host/test/server.test.ts
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import WebSocket from "ws";
+import { readFileSync } from "node:fs";
 import { buildHostServer, buildHostServers, CHILD_LISTEN, PARENT_LISTEN } from "../src/server.js";
 
 let baseUrl = "";
@@ -35,6 +36,20 @@ describe("宿主 HTTP/WS", () => {
     expect((await fetch(`http://${baseUrl}/parent`)).status).toBe(404);
     const html = await (await fetch(`${parentUrl}/parent`)).text();
     expect(html).toContain("家长控制台");
+  });
+
+  test("家长页面使用 AI-DTL 品牌及原始 Logo，不依赖外网或放宽数据鉴权", async () => {
+    const response = await fetch(`${parentUrl}/parent`);
+    const html = await response.text();
+    expect(html).toContain("<title>AI-DTL · 家长控制台</title>");
+    expect(html).toContain("AI 学科心智学习系统");
+    expect(html).toContain("AI-Powered System for Disciplinary Thinking and Learning");
+    expect(html).toContain("孩子先独立建模，AI 根据证据逐级介入，并最终退出");
+    const logo = readFileSync(new URL("../../../assets/brand/ai-dtl-logo.png", import.meta.url));
+    expect(html).toContain(`src="data:image/png;base64,${logo.toString("base64")}"`);
+    expect(html).toContain('alt="AI-DTL"');
+    expect(html).not.toContain("__AI_DTL_LOGO_DATA_URI__");
+    expect((await fetch(`${parentUrl}/parent/sessions`)).status).toBe(401);
   });
 
   test("WebSocket 打开会话收到 outbound，发事件收到 ack，家长 API 能看到状态并提交提案", async () => {

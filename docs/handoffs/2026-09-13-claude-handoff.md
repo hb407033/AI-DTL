@@ -1,16 +1,15 @@
-# AI Scholar 学习系统交接给 Claude
+# AI-DTL · AI 学科心智学习系统交接给 Claude
 
 交接日期：2026-09-13。本文用于本地接手，不代表已向外部 Claude 服务发送代码或数据。
 
 ## 1. 从哪里接手
 
 - 仓库目录：`/Users/houbin/Documents/Codex/2026-08-29/wo-yo`
-- **当前工作分支：`feat/phase-0-native-ipad-gates`**，不是 detached HEAD，也不是没有分支。
-- 当前代码提交：`f4327c9` — 补齐到货前验收映射、音频探针与笔迹持久化。
-- 上一个提交：`febd6f8` — 实现阶段三成长账本核心闭环与儿童权利。
-- 交接时本地 `main` 指向 `febd6f8`，不含 `f4327c9`。不要切到 main 后误判最新功能尚未实现。
-- 当前只有一个 worktree，即上述原目录。创建本文前工作区干净；本文作为新增交接文件保留，尚未提交。
-- 最近一批未推送、未部署、未修改真实家庭学习库。不要自行合并、推送或删除工作分支。
+- **接手基线：`main`**。用户已授权将原 `feat/phase-0-native-ipad-gates` 快进合入 main，再完成 AI-DTL 品牌统一并推送私有仓库；品牌在 `codex/ai-dtl-branding` 上提交后快进合回，避免直接提交保护分支。
+- 私有仓库：`https://github.com/hb407033/AI-DTL.git`。最新发布提交以 `git log -1 main` 与 `git ls-remote origin refs/heads/main` 的实测结果为准，不在其自身文档内写循环依赖的发布 SHA。
+- 历史功能提交：`f4327c9` — 到货前验收映射、音频探针与笔迹持久化；`febd6f8` — 阶段三成长账本核心闭环与儿童权利。均已包含在此次合并基线中。
+- 旧版本文的「main 落后一批」「交接文件尚未提交」已失效，不要按旧状态继续。
+- 本次发布未部署服务、未修改真实家庭学习库。用户此次授权不等于后续可以自行公开仓库、改鉴权或删除工作分支。
 
 接手先确认实际状态，不用文档替代现场检查：
 
@@ -22,6 +21,8 @@ git branch -vv
 ```
 
 ## 2. 产品目标与不可随意改动的决策
+
+品牌确定为 **AI-DTL / AI 学科心智学习系统 / AI-Powered System for Disciplinary Thinking and Learning**，使用用户提供的蓝绿原图。参见 `assets/brand/README.md`；现有包名、Bundle ID 和数据目录为兼容保留，不要将它们当漏改品牌而直接迁移。
 
 面向小学五年级孩子的家庭学习系统。北极星是「孩子先独立建模，AI 根据证据逐级介入，并最终退出」，不是自动讲题或刷题工具。
 
@@ -150,4 +151,4 @@ xcodebuild -project apps/ipad/ScholarPad/ScholarPad.xcodeproj -scheme ScholarPad
 
 ## 9. 可直接发给 Claude 的接手指令
 
-> 请在 `/Users/houbin/Documents/Codex/2026-08-29/wo-yo` 接手 AI Scholar。先读取 `docs/handoffs/2026-09-13-claude-handoff.md` 并核实 Git 状态。当前应在 `feat/phase-0-native-ipad-gates`，最新代码提交为 `f4327c9`，不要误从落后一批的 main 开始。先报告核实结果和你准备处理的第一个具体缺口；继续实施时保持 SwiftUI/PencilKit、Mac 本地 SQLite、家庭 HTTP/WS 与 Codex 优先路线，不覆盖已有改动，不擅自推送、部署或切换模型/鉴权。既有验收映射不是全项通过，Codex 实时身份准入仍 BLOCKED，iPad 真机验收待设备到位。
+> 请在 `/Users/houbin/Documents/Codex/2026-08-29/wo-yo` 接手 AI-DTL（AI 学科心智学习系统）。先读取 `docs/handoffs/2026-09-13-claude-handoff.md` 并核实 Git 状态与 origin。接手基线为私有仓库 `hb407033/AI-DTL` 的 main，原功能分支已并入；有新改动时从核实后的 main 建工作分支，不直接提交 main。先报告核实结果和你准备处理的第一个具体缺口；继续实施时保持 SwiftUI/PencilKit、Mac 本地 SQLite、家庭 HTTP/WS 与 Codex 优先路线，不覆盖已有改动，不擅自推送、部署或切换模型/鉴权。既有验收映射不是全项通过，Codex 实时身份准入仍 BLOCKED，iPad 真机验收待设备到位。

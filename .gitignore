@@ -18,3 +18,15 @@ outputs/
 
 # 系统文件
 .DS_Store
+.env
+.env.*
+!.env.example
+!.env.*.example
+.ai-scholar/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.pem
+*.key
+*.log

@@ -16,9 +16,15 @@ targets:
     platform: iOS
     sources:
       - ScholarPad
+      - ../Shared
+      # 文件夹引用按原样复制，避免 Xcode 的 PNG 优化改变原图字节。
+      - path: ../../../assets/brand
+        type: folder
+        buildPhase: resources
     info:
       path: ScholarPad/Info.plist
       properties:
+        CFBundleDisplayName: "AI-DTL"
         UILaunchScreen: {}
         NSMicrophoneUsageDescription: "用于孩子与学习 Agent 进行实时语音互动。"
         NSLocalNetworkUsageDescription: "用于连接家中的 Mac mini 学习主机。"
