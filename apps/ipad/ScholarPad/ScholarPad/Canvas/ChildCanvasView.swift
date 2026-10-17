@@ -9,6 +9,8 @@ struct ChildCanvasView: UIViewRepresentable {
     let clearToken: Int
     var restored: Data? = nil
     var restoreToken: Int = 0
+    var permitsFingerDrawing: Bool = false
+    var tools: CanvasTools? = nil
     var onDrawing: @MainActor (PKDrawing) -> Void = { _ in }
     let onEvents: @MainActor ([EventPayload]) -> Void
 
@@ -17,13 +19,17 @@ struct ChildCanvasView: UIViewRepresentable {
         #if targetEnvironment(simulator)
         canvas.drawingPolicy = .anyInput   // 模拟器没有 Pencil，放开给鼠标/手指
         #else
-        canvas.drawingPolicy = .pencilOnly
+        canvas.drawingPolicy = permitsFingerDrawing ? .anyInput : .pencilOnly
         #endif
-        canvas.tool = PKInkingTool(.pen, color: .label, width: 4)
-        canvas.backgroundColor = .systemBackground
+        // 墨迹会持久化，不能跟随系统动态色变成“黑纸黑笔”。书写区保持白纸黑笔。
+        canvas.overrideUserInterfaceStyle = .light
+        canvas.tool = PKInkingTool(.pen, color: .black, width: 4)
+        canvas.backgroundColor = .white
         canvas.isOpaque = true
         canvas.delegate = context.coordinator
         canvas.accessibilityIdentifier = "childCanvas"
+        canvas.accessibilityValue = "0"
+        tools?.attach(canvas)
         return canvas
     }
 
@@ -38,7 +44,7 @@ struct ChildCanvasView: UIViewRepresentable {
         }
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator(clearToken: clearToken, onEvents: onEvents, onDrawing: onDrawing) }
+    func makeCoordinator() -> Coordinator { Coordinator(clearToken: clearToken, onEvents: onEvents, onDrawing: onDrawing, tools: tools) }
 
     @MainActor
     final class Coordinator: NSObject, PKCanvasViewDelegate {
@@ -48,17 +54,21 @@ struct ChildCanvasView: UIViewRepresentable {
         private var known: Set<String> = []
         private let onEvents: @MainActor ([EventPayload]) -> Void
         private let onDrawing: @MainActor (PKDrawing) -> Void
+        private let tools: CanvasTools?
 
-        init(clearToken: Int, onEvents: @escaping @MainActor ([EventPayload]) -> Void, onDrawing: @escaping @MainActor (PKDrawing) -> Void) {
+        init(clearToken: Int, onEvents: @escaping @MainActor ([EventPayload]) -> Void, onDrawing: @escaping @MainActor (PKDrawing) -> Void, tools: CanvasTools? = nil) {
             self.lastClearToken = clearToken
             self.onEvents = onEvents
             self.onDrawing = onDrawing
+            self.tools = tools
         }
 
         func restore(_ drawing: PKDrawing, into canvas: PKCanvasView) {
+            tools?.restored(drawing, token: lastRestoreToken)
             known = Set(drawing.strokes.map { StrokeDiff.quantizedHash(points: $0.path.map(\.location)) })
             lastData = drawing.dataRepresentation()
             canvas.drawing = drawing
+            canvas.accessibilityValue = String(drawing.strokes.count)
         }
 
         func clearByChild(_ canvas: PKCanvasView) {
@@ -67,9 +77,11 @@ struct ChildCanvasView: UIViewRepresentable {
         }
 
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
+            canvasView.accessibilityValue = String(canvasView.drawing.strokes.count)
             let data = canvasView.drawing.dataRepresentation()
             guard data != lastData else { return }
             lastData = data
+            tools?.drawingChanged(canvasView.drawing)
             onDrawing(canvasView.drawing)
             let strokes = canvasView.drawing.strokes.map { stroke in
                 let bounds = stroke.renderBounds

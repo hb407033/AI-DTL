@@ -7,9 +7,10 @@ struct ChildSessionView: View {
     @State private var drawing = DrawingArchive()
     @State private var voice = AgentVoice()
     @State private var draft = ""
+    @FocusState private var draftFocused: Bool
+    @State private var waitingForHint = false
     @State private var draftKind: DraftKind = .thought
     @State private var clearToken = 0
-    @State private var breathing = false
     @State private var showNotice = false
     @State private var showUnderstanding = false
     @State private var firstUseNotice: ChildFirstUseNotice?
@@ -61,7 +62,7 @@ struct ChildSessionView: View {
             controlBar
         }
         .background(Color(.systemBackground))
-        .onAppear { client.connect(); breathing = true }
+        .onAppear { client.connect() }
         .task(id: client.sessionId) { drawing.configure(host: client.host, sessionId: client.sessionId); if client.isConnected { drawing.reconnect() } }
         .onChange(of: client.isConnected) { _, connected in if connected { drawing.configure(host: client.host, sessionId: client.sessionId); drawing.reconnect() } }
         .task(id: client.host) { await loadFirstUse() }
@@ -69,9 +70,12 @@ struct ChildSessionView: View {
             if let ledger = ledgerClient { ChildUnderstandingView(client: ledger) }
             else { Text("主机地址暂时不可用，请返回后重试。").padding() }
         }
-        .onChange(of: client.view.speakVersion) { _, _ in voice.speak(client.view.agentLine) }
+        .onChange(of: client.view.speakVersion) { _, _ in waitingForHint = false; voice.speak(client.view.agentLine) }
+        .onChange(of: client.view.taskText) { _, _ in waitingForHint = false }
+        .onChange(of: client.sessionId) { _, _ in waitingForHint = false }
         .onChange(of: client.view.notice) { _, notice in
             guard notice != nil else { return }
+            waitingForHint = false
             showNotice = true
             Task {
                 try? await Task.sleep(for: .seconds(3))
@@ -95,8 +99,9 @@ struct ChildSessionView: View {
             Circle()
                 .fill(client.isConnected ? Color.green.opacity(0.7) : Color.gray.opacity(0.4))
                 .frame(width: 14, height: 14)
-                .scaleEffect(breathing && client.view.presence == .listening ? 1.25 : 0.85)
-                .animation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true), value: breathing)
+                // 无限动画会让真机辅助操作一直等不到界面空闲；只在状态改变时过渡。
+                .scaleEffect(client.view.presence == .listening ? 1 : 0.85)
+                .animation(.easeInOut(duration: 0.2), value: client.view.presence)
                 .accessibilityHidden(true)
             Text(client.view.taskText.isEmpty ? "正在准备今天的题目…" : client.view.taskText)
                 .font(.title2)
@@ -122,7 +127,10 @@ struct ChildSessionView: View {
     private var agentBubble: some View {
         HStack {
             Image(systemName: "bubble.left.fill").foregroundStyle(.blue)
-            Text(client.view.agentLine.isEmpty ? "我在这里，你先试试看。" : client.view.agentLine)
+            // 这是客户端等待反馈，不作为教师发言朗读或写入学习证据。
+            Text(waitingForHint
+                 ? (client.isConnected ? "正在等待提示…" : "暂时离线，连接恢复后再继续。")
+                 : (client.view.agentLine.isEmpty ? "我在这里，你先试试看。" : client.view.agentLine))
                 .font(.title3)
                 .accessibilityIdentifier("agentLine")
             Spacer()
@@ -144,6 +152,7 @@ struct ChildSessionView: View {
             TextField("说一说你的想法…", text: $draft)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityIdentifier("draftField")
+                .focused($draftFocused)
                 .onSubmit(sendDraft)
             Button("说") { sendDraft() }
                 .buttonStyle(.borderedProminent)
@@ -177,7 +186,11 @@ struct ChildSessionView: View {
 
     private var completedOverlay: some View {
         Color.green.opacity(0.15).overlay {
-            Text("今天这一题到这里，你做得很认真。").font(.largeTitle)
+            Text("今天这一题到这里，你做得很认真。")
+                .font(.largeTitle)
+                .foregroundStyle(.black)
+                .multilineTextAlignment(.center)
+                .padding(24)
         }
         .allowsHitTesting(false)
     }
@@ -225,6 +238,7 @@ struct ChildSessionView: View {
     private func sendDraft() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        draftFocused = false
         draft = ""
         childActed()
         // 讲回阶段说的话就是讲回；其余按孩子自己选的“想法 / 答案”发
@@ -236,6 +250,9 @@ struct ChildSessionView: View {
     }
 
     private func act(_ payload: EventPayload) {
+        draftFocused = false
+        if case .helpRequest = payload { waitingForHint = true }
+        else { waitingForHint = false }
         childActed()
         client.send(payload, source: .childButton)
     }

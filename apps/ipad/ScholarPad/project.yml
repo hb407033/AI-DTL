@@ -2,6 +2,7 @@
 # 与阶段 0 探针 App（../ScholarPadProbe）分开：探针只做门禁测量，这里才是孩子面对的界面。
 name: ScholarPad
 options:
+  developmentLanguage: zh-Hans
   bundleIdPrefix: com.houbin.aischolar
   deploymentTarget:
     iOS: "18.0"
@@ -25,13 +26,21 @@ targets:
       path: ScholarPad/Info.plist
       properties:
         CFBundleDisplayName: "AI-DTL"
+        CFBundleDevelopmentRegion: zh-Hans
+        CFBundleLocalizations:
+          - zh-Hans
         UILaunchScreen: {}
         NSMicrophoneUsageDescription: "用于孩子与学习 Agent 进行实时语音互动。"
+        NSCameraUsageDescription: "用于拍摄你选择的数学题，确认后交给学习老师一起探索。"
         NSLocalNetworkUsageDescription: "用于连接家中的 Mac mini 学习主机。"
+        NSBonjourServices:
+          - _ai-dtl._tcp
         # 只放开局域网明文连接（家庭局域网 HTTP/WS 决策，设计稿 11.4），不设置全局 NSAllowsArbitraryLoads
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
     settings:
@@ -52,6 +61,8 @@ targets:
     platform: iOS
     sources:
       - ScholarPadTests
+      - path: ../../../packages/session-contracts/fixtures/workspace-learning-v2.json
+        buildPhase: resources
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
