@@ -12,6 +12,11 @@
     "gate:codex": "pnpm --filter @ai-scholar/codex-realtime-probe start",
     "gate:report": "pnpm --filter @ai-scholar/gate-report start",
     "host": "pnpm --filter @ai-scholar/agent-host start",
+    "ai:check": "node --env-file-if-exists=.env.ai.local --import tsx apps/agent-host/src/ai/check.ts",
+    "host:simple": "node --env-file-if-exists=.env.ai.local --import tsx apps/agent-host/src/ai/simple-tutor.ts",
+    "host:learning": "node --env-file-if-exists=.env.ai.local --import tsx apps/agent-host/src/ai/learning-tutor.ts",
+    "probe:qwen-capability": "node --env-file-if-exists=.env.ai.local --import tsx apps/agent-host/src/ai/qwen-capability-probe.ts",
+    "host:pi": "node --env-file-if-exists=.env.ai.local --import tsx apps/agent-host/src/server.ts --pi",
     "session:replay": "pnpm --filter @ai-scholar/agent-host replay"
   },
   "devDependencies": {

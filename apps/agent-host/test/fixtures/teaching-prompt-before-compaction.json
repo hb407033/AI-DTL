@@ -1,0 +1,722 @@
+[
+  {
+    "name": "base",
+    "historicalFullPromptSha256": "27201619ce1d7ed64b1c5a61bf7201d454e4cd8999a992670adb4ba080b73f46",
+    "prefixLength": 4092,
+    "facts": "{\"problem\":\"12.5÷0.5，先估，再计算。\",\"turnId\":\"t\",\"child\":\"\",\"history\":[],\"previousWork\":[],\"prior\":[]}",
+    "rules": [
+      {
+        "slot": "method",
+        "text": "实际题目是小数除法，不沿用资料里可能过时的小数乘法单元。主线是被除数和除数同时乘同一倍数10、商不变，转为125÷5。method必须scale_both。不教倒数、不将除以0.5转换为乘2，不把这种捷径作为解释。"
+      },
+      {
+        "slot": "visibleSteps",
+        "text": "有可见步骤或口述计算，先承接已有正确部分；已经转换成整数就不退回让他重新估大估小。商不变理由未说明只限制理解结论，不规定每轮必须先追问理由；先接住当前计算、检验或澄清请求。不能只背口诀就宣布理解。"
+      },
+      {
+        "slot": "wrongQuotient",
+        "text": "若出现可核对的整数除法错商，先检查商的每一位是否有计算依据。零可能多余，不能问‘零该放在哪一位’暗示必须保留或挪动零；可核对这个零是否需要。不直接报正确商；如果本轮已自行修正，不能继续批评旧图错误。"
+      },
+      {
+        "slot": "progress",
+        "text": "宿主已核对的理解证据=尚无；本轮focus允许transformation或invariance。transformation=同时变换两个数；invariance=为什么同时扩大后商不变；place_value=尝试整数计算或核对商的位值；verify=孩子选择办法核验；return=交还独立尝试。未解决证据不是强制提问顺序。"
+      },
+      {
+        "slot": "focusChoice",
+        "text": ""
+      },
+      {
+        "slot": "transformationChoice",
+        "text": "还没有孩子正确变换的证据。初次求助可选transformation，给一个具体小动作；不要求先证明商不变才能动手，不替孩子列完整转换式。"
+      },
+      {
+        "slot": "calculationSteps",
+        "text": ""
+      },
+      {
+        "slot": "operationCheck",
+        "text": ""
+      },
+      {
+        "slot": "verifiedWithoutReason",
+        "text": ""
+      },
+      {
+        "slot": "withholdAnswer",
+        "text": "孩子没有给出正确商，utterance不得说25或其中文读法，也不得拆成商的各位数字暗示答案。"
+      },
+      {
+        "slot": "inviteCalculation",
+        "text": ""
+      },
+      {
+        "slot": "transfer",
+        "text": ""
+      },
+      {
+        "slot": "reported",
+        "text": ""
+      },
+      {
+        "slot": "quantityMeaning",
+        "text": "解释商不变时，总量和每份同时乘同一倍数，组数不变。不能说‘份数整体放大而每份大小没变’；换计数单位时真实数量未改变，但两边记录的数一起变了。"
+      },
+      {
+        "slot": "transformation",
+        "text": "transformation且review：只指出孩子两边变化不同，问另一边准备如何处理；不能直接替他说完整的转换式。hint也只给一处小动作，不一口气选倍数、改两数再列式。"
+      },
+      {
+        "slot": "checkInvitation",
+        "text": "孩子有结果后邀请用乘法检验：商×除数是否回到被除数。这不是除以0.5改乘2。孩子自己说明理由并完成检验后，交还独立尝试或提出一道同类小数除法检验迁移，不提供新题解答，不宣布掌握或标签化。"
+      },
+      {
+        "slot": "verify",
+        "text": "verify焦点下：review先问孩子自己想用什么办法检验，不能指定乘法算式替他选方法；hint权限才可以提醒商乘除数，仍由孩子计算。"
+      },
+      {
+        "slot": "operationAction",
+        "text": ""
+      }
+    ]
+  },
+  {
+    "name": "wrong-answer",
+    "historicalFullPromptSha256": "ad0a2df67cb07ac0013c0846547492b516b9571792f33a6d2009a9bc497f0bd1",
+    "prefixLength": 4004,
+    "facts": "{\"problem\":\"12.5÷0.5，先估，再计算。\",\"turnId\":\"t\",\"child\":\"我把12.5和0.5同时乘10，写成125除以5，算出205。\",\"history\":[],\"previousWork\":[],\"prior\":[]}",
+    "rules": [
+      {
+        "slot": "method",
+        "text": "实际题目是小数除法，不沿用资料里可能过时的小数乘法单元。主线是被除数和除数同时乘同一倍数10、商不变，转为125÷5。method必须scale_both。不教倒数、不将除以0.5转换为乘2，不把这种捷径作为解释。"
+      },
+      {
+        "slot": "visibleSteps",
+        "text": "有可见步骤或口述计算，先承接已有正确部分；已经转换成整数就不退回让他重新估大估小。商不变理由未说明只限制理解结论，不规定每轮必须先追问理由；先接住当前计算、检验或澄清请求。不能只背口诀就宣布理解。"
+      },
+      {
+        "slot": "wrongQuotient",
+        "text": "若出现可核对的整数除法错商，先检查商的每一位是否有计算依据。零可能多余，不能问‘零该放在哪一位’暗示必须保留或挪动零；可核对这个零是否需要。不直接报正确商；如果本轮已自行修正，不能继续批评旧图错误。"
+      },
+      {
+        "slot": "progress",
+        "text": "宿主已核对的理解证据=transformation；本轮focus允许place_value。transformation=同时变换两个数；invariance=为什么同时扩大后商不变；place_value=尝试整数计算或核对商的位值；verify=孩子选择办法核验；return=交还独立尝试。未解决证据不是强制提问顺序。"
+      },
+      {
+        "slot": "focusChoice",
+        "text": ""
+      },
+      {
+        "slot": "transformationChoice",
+        "text": ""
+      },
+      {
+        "slot": "calculationSteps",
+        "text": ""
+      },
+      {
+        "slot": "operationCheck",
+        "text": ""
+      },
+      {
+        "slot": "verifiedWithoutReason",
+        "text": ""
+      },
+      {
+        "slot": "withholdAnswer",
+        "text": "孩子没有给出正确商，utterance不得说25或其中文读法，也不得拆成商的各位数字暗示答案。"
+      },
+      {
+        "slot": "inviteCalculation",
+        "text": ""
+      },
+      {
+        "slot": "transfer",
+        "text": ""
+      },
+      {
+        "slot": "reported",
+        "text": "孩子最近报告的商=205；‘我改成某数’在这段计算上下文中是改商，不是把除数或被除数改成该数。不得混淆数学角色。"
+      },
+      {
+        "slot": "quantityMeaning",
+        "text": "解释商不变时，总量和每份同时乘同一倍数，组数不变。不能说‘份数整体放大而每份大小没变’；换计数单位时真实数量未改变，但两边记录的数一起变了。"
+      },
+      {
+        "slot": "transformation",
+        "text": "transformation且review：只指出孩子两边变化不同，问另一边准备如何处理；不能直接替他说完整的转换式。hint也只给一处小动作，不一口气选倍数、改两数再列式。"
+      },
+      {
+        "slot": "checkInvitation",
+        "text": "孩子有结果后邀请用乘法检验：商×除数是否回到被除数。这不是除以0.5改乘2。孩子自己说明理由并完成检验后，交还独立尝试或提出一道同类小数除法检验迁移，不提供新题解答，不宣布掌握或标签化。"
+      },
+      {
+        "slot": "verify",
+        "text": "verify焦点下：review先问孩子自己想用什么办法检验，不能指定乘法算式替他选方法；hint权限才可以提醒商乘除数，仍由孩子计算。"
+      },
+      {
+        "slot": "operationAction",
+        "text": ""
+      }
+    ]
+  },
+  {
+    "name": "help2",
+    "historicalFullPromptSha256": "098096da4133eaec4c64422ed486e6f520faf507bb932a727698dc0a358fed3f",
+    "prefixLength": 4132,
+    "facts": "{\"problem\":\"12.5÷0.5，先估，再计算。\",\"turnId\":\"t\",\"child\":\"还是不会，再帮我一下。\",\"history\":[{\"turnId\":\"prior-0\",\"child\":\"我不会，帮我一下。\",\"focus\":\"invariance\",\"utterance\":\"你准备怎么继续？\",\"resolved\":[]}],\"previousWork\":[],\"prior\":[]}",
+    "rules": [
+      {
+        "slot": "method",
+        "text": "实际题目是小数除法，不沿用资料里可能过时的小数乘法单元。主线是被除数和除数同时乘同一倍数10、商不变，转为125÷5。method必须scale_both。不教倒数、不将除以0.5转换为乘2，不把这种捷径作为解释。"
+      },
+      {
+        "slot": "visibleSteps",
+        "text": "有可见步骤或口述计算，先承接已有正确部分；已经转换成整数就不退回让他重新估大估小。商不变理由未说明只限制理解结论，不规定每轮必须先追问理由；先接住当前计算、检验或澄清请求。不能只背口诀就宣布理解。"
+      },
+      {
+        "slot": "wrongQuotient",
+        "text": "若出现可核对的整数除法错商，先检查商的每一位是否有计算依据。零可能多余，不能问‘零该放在哪一位’暗示必须保留或挪动零；可核对这个零是否需要。不直接报正确商；如果本轮已自行修正，不能继续批评旧图错误。"
+      },
+      {
+        "slot": "progress",
+        "text": "宿主已核对的理解证据=尚无；本轮focus允许transformation或invariance。transformation=同时变换两个数；invariance=为什么同时扩大后商不变；place_value=尝试整数计算或核对商的位值；verify=孩子选择办法核验；return=交还独立尝试。未解决证据不是强制提问顺序。"
+      },
+      {
+        "slot": "focusChoice",
+        "text": ""
+      },
+      {
+        "slot": "transformationChoice",
+        "text": "还没有孩子正确变换的证据。初次求助可选transformation，给一个具体小动作；不要求先证明商不变才能动手，不替孩子列完整转换式。"
+      },
+      {
+        "slot": "calculationSteps",
+        "text": ""
+      },
+      {
+        "slot": "operationCheck",
+        "text": ""
+      },
+      {
+        "slot": "verifiedWithoutReason",
+        "text": ""
+      },
+      {
+        "slot": "withholdAnswer",
+        "text": "孩子没有给出正确商，utterance不得说25或其中文读法，也不得拆成商的各位数字暗示答案。"
+      },
+      {
+        "slot": "inviteCalculation",
+        "text": ""
+      },
+      {
+        "slot": "transfer",
+        "text": ""
+      },
+      {
+        "slot": "reported",
+        "text": ""
+      },
+      {
+        "slot": "quantityMeaning",
+        "text": "解释商不变时，总量和每份同时乘同一倍数，组数不变。不能说‘份数整体放大而每份大小没变’；换计数单位时真实数量未改变，但两边记录的数一起变了。"
+      },
+      {
+        "slot": "transformation",
+        "text": "transformation且review：只指出孩子两边变化不同，问另一边准备如何处理；不能直接替他说完整的转换式。hint也只给一处小动作，不一口气选倍数、改两数再列式。"
+      },
+      {
+        "slot": "checkInvitation",
+        "text": "孩子有结果后邀请用乘法检验：商×除数是否回到被除数。这不是除以0.5改乘2。孩子自己说明理由并完成检验后，交还独立尝试或提出一道同类小数除法检验迁移，不提供新题解答，不宣布掌握或标签化。"
+      },
+      {
+        "slot": "verify",
+        "text": "verify焦点下：review先问孩子自己想用什么办法检验，不能指定乘法算式替他选方法；hint权限才可以提醒商乘除数，仍由孩子计算。"
+      },
+      {
+        "slot": "operationAction",
+        "text": ""
+      }
+    ]
+  },
+  {
+    "name": "steps",
+    "historicalFullPromptSha256": "9d718b10cd97bbc5eebb791fef9f7a3f42ee6075155ebdcf53e08c44cdfa8baa",
+    "prefixLength": 4147,
+    "facts": "{\"problem\":\"12.5÷0.5，先估，再计算。\",\"turnId\":\"t\",\"child\":\"我想先算125除以5，怎么列竖式？\",\"history\":[{\"turnId\":\"prior-0\",\"child\":\"我把12.5和0.5同时乘10，变成125除以5。\",\"focus\":\"invariance\",\"utterance\":\"你准备怎么继续？\",\"resolved\":[]}],\"previousWork\":[],\"prior\":[]}",
+    "rules": [
+      {
+        "slot": "method",
+        "text": "实际题目是小数除法，不沿用资料里可能过时的小数乘法单元。主线是被除数和除数同时乘同一倍数10、商不变，转为125÷5。method必须scale_both。不教倒数、不将除以0.5转换为乘2，不把这种捷径作为解释。"
+      },
+      {
+        "slot": "visibleSteps",
+        "text": "有可见步骤或口述计算，先承接已有正确部分；已经转换成整数就不退回让他重新估大估小。商不变理由未说明只限制理解结论，不规定每轮必须先追问理由；先接住当前计算、检验或澄清请求。不能只背口诀就宣布理解。"
+      },
+      {
+        "slot": "wrongQuotient",
+        "text": "若出现可核对的整数除法错商，先检查商的每一位是否有计算依据。零可能多余，不能问‘零该放在哪一位’暗示必须保留或挪动零；可核对这个零是否需要。不直接报正确商；如果本轮已自行修正，不能继续批评旧图错误。"
+      },
+      {
+        "slot": "progress",
+        "text": "宿主已核对的理解证据=transformation；本轮focus允许place_value。transformation=同时变换两个数；invariance=为什么同时扩大后商不变；place_value=尝试整数计算或核对商的位值；verify=孩子选择办法核验；return=交还独立尝试。未解决证据不是强制提问顺序。"
+      },
+      {
+        "slot": "focusChoice",
+        "text": ""
+      },
+      {
+        "slot": "transformationChoice",
+        "text": ""
+      },
+      {
+        "slot": "calculationSteps",
+        "text": "孩子本轮具体要竖式/计算步骤：utterance须承接竖式或数位，只检查125÷5的一个书写/除法步骤。不要偷换成乘法检验，也不要直接演示完整竖式或报商。"
+      },
+      {
+        "slot": "operationCheck",
+        "text": ""
+      },
+      {
+        "slot": "verifiedWithoutReason",
+        "text": ""
+      },
+      {
+        "slot": "withholdAnswer",
+        "text": "孩子没有给出正确商，utterance不得说25或其中文读法，也不得拆成商的各位数字暗示答案。"
+      },
+      {
+        "slot": "inviteCalculation",
+        "text": "孩子尚未提供商，只邀请他尝试计算或说自己的步骤；不得预填商的2和5，不得假定商有百位。"
+      },
+      {
+        "slot": "transfer",
+        "text": ""
+      },
+      {
+        "slot": "reported",
+        "text": ""
+      },
+      {
+        "slot": "quantityMeaning",
+        "text": "解释商不变时，总量和每份同时乘同一倍数，组数不变。不能说‘份数整体放大而每份大小没变’；换计数单位时真实数量未改变，但两边记录的数一起变了。"
+      },
+      {
+        "slot": "transformation",
+        "text": "transformation且review：只指出孩子两边变化不同，问另一边准备如何处理；不能直接替他说完整的转换式。hint也只给一处小动作，不一口气选倍数、改两数再列式。"
+      },
+      {
+        "slot": "checkInvitation",
+        "text": "孩子有结果后邀请用乘法检验：商×除数是否回到被除数。这不是除以0.5改乘2。孩子自己说明理由并完成检验后，交还独立尝试或提出一道同类小数除法检验迁移，不提供新题解答，不宣布掌握或标签化。"
+      },
+      {
+        "slot": "verify",
+        "text": "verify焦点下：review先问孩子自己想用什么办法检验，不能指定乘法算式替他选方法；hint权限才可以提醒商乘除数，仍由孩子计算。"
+      },
+      {
+        "slot": "operationAction",
+        "text": ""
+      }
+    ]
+  },
+  {
+    "name": "unit-transfer",
+    "historicalFullPromptSha256": "deb01c7dfd8f316c4e02617dbbf14eecbad694c983a91a3af9a3c8afdbef4e27",
+    "prefixLength": 4042,
+    "facts": "{\"problem\":\"12.5÷0.5，先估，再计算。\",\"turnId\":\"t\",\"child\":\"我用钱来想，元换角只是单位变了；我自己试四点八除零点六，算出九。\",\"history\":[{\"turnId\":\"prior-0\",\"child\":\"我把12.5和0.5同时乘10，变成125除以5。\",\"focus\":\"invariance\",\"utterance\":\"你准备怎么继续？\",\"resolved\":[]},{\"turnId\":\"prior-1\",\"child\":\"总量和每一组都扩大十倍，能分的组数没变，所以商不变。\",\"focus\":\"invariance\",\"utterance\":\"你准备怎么继续？\",\"resolved\":[]},{\"turnId\":\"prior-2\",\"child\":\"二十五乘零点五等于十二点五。\",\"focus\":\"invariance\",\"utterance\":\"你准备怎么继续？\",\"resolved\":[]}],\"previousWork\":[],\"prior\":[]}",
+    "rules": [
+      {
+        "slot": "method",
+        "text": "实际题目是小数除法，不沿用资料里可能过时的小数乘法单元。主线是被除数和除数同时乘同一倍数10、商不变，转为125÷5。method必须scale_both。不教倒数、不将除以0.5转换为乘2，不把这种捷径作为解释。"
+      },
+      {
+        "slot": "visibleSteps",
+        "text": "有可见步骤或口述计算，先承接已有正确部分；已经转换成整数就不退回让他重新估大估小。商不变理由未说明只限制理解结论，不规定每轮必须先追问理由；先接住当前计算、检验或澄清请求。不能只背口诀就宣布理解。"
+      },
+      {
+        "slot": "wrongQuotient",
+        "text": "若出现可核对的整数除法错商，先检查商的每一位是否有计算依据。零可能多余，不能问‘零该放在哪一位’暗示必须保留或挪动零；可核对这个零是否需要。不直接报正确商；如果本轮已自行修正，不能继续批评旧图错误。"
+      },
+      {
+        "slot": "progress",
+        "text": "宿主已核对的理解证据=transformation、invariance、verify；本轮focus允许clarify。transformation=同时变换两个数；invariance=为什么同时扩大后商不变；place_value=尝试整数计算或核对商的位值；verify=孩子选择办法核验；return=交还独立尝试。未解决证据不是强制提问顺序。"
+      },
+      {
+        "slot": "focusChoice",
+        "text": ""
+      },
+      {
+        "slot": "transformationChoice",
+        "text": ""
+      },
+      {
+        "slot": "calculationSteps",
+        "text": ""
+      },
+      {
+        "slot": "operationCheck",
+        "text": ""
+      },
+      {
+        "slot": "verifiedWithoutReason",
+        "text": ""
+      },
+      {
+        "slot": "withholdAnswer",
+        "text": "孩子没有给出正确商，utterance不得说8或其中文读法，也不得拆成商的各位数字暗示答案。"
+      },
+      {
+        "slot": "inviteCalculation",
+        "text": ""
+      },
+      {
+        "slot": "transfer",
+        "text": "孩子已另举新例4.8÷0.6，与原题分开核对。新例乘法检验还未核对一致，仅讨论新例中一处可检查点。不能把新例的答案当成原题的新答案，不能退回重问原题已解释的问题。"
+      },
+      {
+        "slot": "reported",
+        "text": ""
+      },
+      {
+        "slot": "quantityMeaning",
+        "text": "解释商不变时，总量和每份同时乘同一倍数，组数不变。不能说‘份数整体放大而每份大小没变’；换计数单位时真实数量未改变，但两边记录的数一起变了。"
+      },
+      {
+        "slot": "transformation",
+        "text": "transformation且review：只指出孩子两边变化不同，问另一边准备如何处理；不能直接替他说完整的转换式。hint也只给一处小动作，不一口气选倍数、改两数再列式。"
+      },
+      {
+        "slot": "checkInvitation",
+        "text": "孩子有结果后邀请用乘法检验：商×除数是否回到被除数。这不是除以0.5改乘2。孩子自己说明理由并完成检验后，交还独立尝试或提出一道同类小数除法检验迁移，不提供新题解答，不宣布掌握或标签化。"
+      },
+      {
+        "slot": "verify",
+        "text": "verify焦点下：review先问孩子自己想用什么办法检验，不能指定乘法算式替他选方法；hint权限才可以提醒商乘除数，仍由孩子计算。"
+      },
+      {
+        "slot": "operationAction",
+        "text": ""
+      }
+    ]
+  },
+  {
+    "name": "operation-zero",
+    "historicalFullPromptSha256": "231c12945f7b7eeca1ff9c4a3995b05ccea7b7a0d9edafd720c0817f6ddf017d",
+    "prefixLength": 4183,
+    "facts": "{\"problem\":\"12.5÷0.5，先估，再计算。\",\"turnId\":\"t\",\"child\":\"我是不是把小数点划掉，右边再补个零，然后当整数除？\",\"history\":[{\"turnId\":\"prior-0\",\"child\":\"我把12.5和0.5同时乘10，变成125除以5。\",\"focus\":\"invariance\",\"utterance\":\"你准备怎么继续？\",\"resolved\":[]}],\"previousWork\":[],\"prior\":[]}",
+    "rules": [
+      {
+        "slot": "method",
+        "text": "实际题目是小数除法，不沿用资料里可能过时的小数乘法单元。主线是被除数和除数同时乘同一倍数10、商不变，转为125÷5。method必须scale_both。不教倒数、不将除以0.5转换为乘2，不把这种捷径作为解释。"
+      },
+      {
+        "slot": "visibleSteps",
+        "text": "有可见步骤或口述计算，先承接已有正确部分；已经转换成整数就不退回让他重新估大估小。商不变理由未说明只限制理解结论，不规定每轮必须先追问理由；先接住当前计算、检验或澄清请求。不能只背口诀就宣布理解。"
+      },
+      {
+        "slot": "wrongQuotient",
+        "text": "若出现可核对的整数除法错商，先检查商的每一位是否有计算依据。零可能多余，不能问‘零该放在哪一位’暗示必须保留或挪动零；可核对这个零是否需要。不直接报正确商；如果本轮已自行修正，不能继续批评旧图错误。"
+      },
+      {
+        "slot": "progress",
+        "text": "宿主已核对的理解证据=尚无；本轮focus允许clarify。transformation=同时变换两个数；invariance=为什么同时扩大后商不变；place_value=尝试整数计算或核对商的位值；verify=孩子选择办法核验；return=交还独立尝试。未解决证据不是强制提问顺序。"
+      },
+      {
+        "slot": "focusChoice",
+        "text": ""
+      },
+      {
+        "slot": "transformationChoice",
+        "text": ""
+      },
+      {
+        "slot": "calculationSteps",
+        "text": ""
+      },
+      {
+        "slot": "operationCheck",
+        "text": "完整操作待核对：孩子提出了补零，不能只肯定‘划掉小数点相当于乘10’。本轮只检查被除数12.5经过孩子整套操作会写成什么数，只问这一个结果；不同时追问除数、位置、条件或为什么。先不认定一定错，也不肯定整个规则。区分缺位补足与额外添零要在得到孩子具体操作后进行，不能在本轮堆成几个问题。"
+      },
+      {
+        "slot": "verifiedWithoutReason",
+        "text": ""
+      },
+      {
+        "slot": "withholdAnswer",
+        "text": "孩子没有给出正确商，utterance不得说25或其中文读法，也不得拆成商的各位数字暗示答案。"
+      },
+      {
+        "slot": "inviteCalculation",
+        "text": ""
+      },
+      {
+        "slot": "transfer",
+        "text": ""
+      },
+      {
+        "slot": "reported",
+        "text": ""
+      },
+      {
+        "slot": "quantityMeaning",
+        "text": "解释商不变时，总量和每份同时乘同一倍数，组数不变。不能说‘份数整体放大而每份大小没变’；换计数单位时真实数量未改变，但两边记录的数一起变了。"
+      },
+      {
+        "slot": "transformation",
+        "text": "transformation且review：只指出孩子两边变化不同，问另一边准备如何处理；不能直接替他说完整的转换式。hint也只给一处小动作，不一口气选倍数、改两数再列式。"
+      },
+      {
+        "slot": "checkInvitation",
+        "text": "孩子有结果后邀请用乘法检验：商×除数是否回到被除数。这不是除以0.5改乘2。孩子自己说明理由并完成检验后，交还独立尝试或提出一道同类小数除法检验迁移，不提供新题解答，不宣布掌握或标签化。"
+      },
+      {
+        "slot": "verify",
+        "text": "verify焦点下：review先问孩子自己想用什么办法检验，不能指定乘法算式替他选方法；hint权限才可以提醒商乘除数，仍由孩子计算。"
+      },
+      {
+        "slot": "operationAction",
+        "text": "本轮执行的唯一教学动作：请孩子给出12.5划点并补零后写出的数。utterance只用一句自然的提问，必须提到补零，只有一个问题和一个问号；不附加第二句问题，不先讲原理，不说‘对/正确’。其他焦点的提问指导本轮不执行。"
+      }
+    ]
+  },
+  {
+    "name": "ordinary",
+    "historicalFullPromptSha256": "8c4917acda7cab57303a4e9cd85ff0f95be39c985341a095a8c996acf362f789",
+    "prefixLength": 3257,
+    "facts": "{\"problem\":\"平行四边形底8高3求面积。\",\"turnId\":\"t\",\"child\":\"我想先试试。\",\"history\":[],\"previousWork\":[],\"prior\":[]}",
+    "rules": [
+      {
+        "slot": "method",
+        "text": ""
+      },
+      {
+        "slot": "visibleSteps",
+        "text": ""
+      },
+      {
+        "slot": "wrongQuotient",
+        "text": ""
+      },
+      {
+        "slot": "progress",
+        "text": ""
+      },
+      {
+        "slot": "focusChoice",
+        "text": ""
+      },
+      {
+        "slot": "transformationChoice",
+        "text": ""
+      },
+      {
+        "slot": "calculationSteps",
+        "text": ""
+      },
+      {
+        "slot": "operationCheck",
+        "text": ""
+      },
+      {
+        "slot": "verifiedWithoutReason",
+        "text": ""
+      },
+      {
+        "slot": "withholdAnswer",
+        "text": ""
+      },
+      {
+        "slot": "inviteCalculation",
+        "text": ""
+      },
+      {
+        "slot": "transfer",
+        "text": ""
+      },
+      {
+        "slot": "reported",
+        "text": ""
+      },
+      {
+        "slot": "quantityMeaning",
+        "text": ""
+      },
+      {
+        "slot": "transformation",
+        "text": ""
+      },
+      {
+        "slot": "checkInvitation",
+        "text": ""
+      },
+      {
+        "slot": "verify",
+        "text": ""
+      },
+      {
+        "slot": "operationAction",
+        "text": ""
+      }
+    ]
+  },
+  {
+    "name": "focus-choice",
+    "historicalFullPromptSha256": "2e205235a83fd07f343641adc9cb971a4470d485260f15ece713c8e59b97c2d4",
+    "prefixLength": 4084,
+    "facts": "{\"problem\":\"12.5÷0.5，先估，再计算。\",\"turnId\":\"t\",\"child\":\"我已经把两边同时乘10了。\",\"history\":[{\"turnId\":\"prior-0\",\"child\":\"我把12.5和0.5同时乘10，变成125除以5。\",\"focus\":\"invariance\",\"utterance\":\"你准备怎么继续？\",\"resolved\":[]}],\"previousWork\":[],\"prior\":[]}",
+    "rules": [
+      {
+        "slot": "method",
+        "text": "实际题目是小数除法，不沿用资料里可能过时的小数乘法单元。主线是被除数和除数同时乘同一倍数10、商不变，转为125÷5。method必须scale_both。不教倒数、不将除以0.5转换为乘2，不把这种捷径作为解释。"
+      },
+      {
+        "slot": "visibleSteps",
+        "text": "有可见步骤或口述计算，先承接已有正确部分；已经转换成整数就不退回让他重新估大估小。商不变理由未说明只限制理解结论，不规定每轮必须先追问理由；先接住当前计算、检验或澄清请求。不能只背口诀就宣布理解。"
+      },
+      {
+        "slot": "wrongQuotient",
+        "text": "若出现可核对的整数除法错商，先检查商的每一位是否有计算依据。零可能多余，不能问‘零该放在哪一位’暗示必须保留或挪动零；可核对这个零是否需要。不直接报正确商；如果本轮已自行修正，不能继续批评旧图错误。"
+      },
+      {
+        "slot": "progress",
+        "text": "宿主已核对的理解证据=transformation；本轮focus允许invariance或place_value。transformation=同时变换两个数；invariance=为什么同时扩大后商不变；place_value=尝试整数计算或核对商的位值；verify=孩子选择办法核验；return=交还独立尝试。未解决证据不是强制提问顺序。"
+      },
+      {
+        "slot": "focusChoice",
+        "text": "本轮不要默认选invariance：孩子主动问原因就选invariance；否则准备动手算或试除就选place_value，给出正确商优先verify。选择看最新表达，不要求说出‘我想先算’这句暗号。理由未说明仍留待以后，不伪造理解，不机械卡住计算。"
+      },
+      {
+        "slot": "transformationChoice",
+        "text": ""
+      },
+      {
+        "slot": "calculationSteps",
+        "text": ""
+      },
+      {
+        "slot": "operationCheck",
+        "text": ""
+      },
+      {
+        "slot": "verifiedWithoutReason",
+        "text": ""
+      },
+      {
+        "slot": "withholdAnswer",
+        "text": "孩子没有给出正确商，utterance不得说25或其中文读法，也不得拆成商的各位数字暗示答案。"
+      },
+      {
+        "slot": "inviteCalculation",
+        "text": ""
+      },
+      {
+        "slot": "transfer",
+        "text": ""
+      },
+      {
+        "slot": "reported",
+        "text": ""
+      },
+      {
+        "slot": "quantityMeaning",
+        "text": "解释商不变时，总量和每份同时乘同一倍数，组数不变。不能说‘份数整体放大而每份大小没变’；换计数单位时真实数量未改变，但两边记录的数一起变了。"
+      },
+      {
+        "slot": "transformation",
+        "text": "transformation且review：只指出孩子两边变化不同，问另一边准备如何处理；不能直接替他说完整的转换式。hint也只给一处小动作，不一口气选倍数、改两数再列式。"
+      },
+      {
+        "slot": "checkInvitation",
+        "text": "孩子有结果后邀请用乘法检验：商×除数是否回到被除数。这不是除以0.5改乘2。孩子自己说明理由并完成检验后，交还独立尝试或提出一道同类小数除法检验迁移，不提供新题解答，不宣布掌握或标签化。"
+      },
+      {
+        "slot": "verify",
+        "text": "verify焦点下：review先问孩子自己想用什么办法检验，不能指定乘法算式替他选方法；hint权限才可以提醒商乘除数，仍由孩子计算。"
+      },
+      {
+        "slot": "operationAction",
+        "text": ""
+      }
+    ]
+  },
+  {
+    "name": "verified-without-reason",
+    "historicalFullPromptSha256": "ec6760a34400948f391e88624e992ab115ad352a5908eaeecd2db4dc657da1f6",
+    "prefixLength": 4044,
+    "facts": "{\"problem\":\"12.5÷0.5，先估，再计算。\",\"turnId\":\"t\",\"child\":\"接下来我自己试试。\",\"history\":[{\"turnId\":\"prior-0\",\"child\":\"我把12.5和0.5同时乘10，变成125除以5。\",\"focus\":\"invariance\",\"utterance\":\"你准备怎么继续？\",\"resolved\":[]},{\"turnId\":\"prior-1\",\"child\":\"我算出25，25乘0.5等于12.5。\",\"focus\":\"invariance\",\"utterance\":\"你准备怎么继续？\",\"resolved\":[]}],\"previousWork\":[],\"prior\":[]}",
+    "rules": [
+      {
+        "slot": "method",
+        "text": "实际题目是小数除法，不沿用资料里可能过时的小数乘法单元。主线是被除数和除数同时乘同一倍数10、商不变，转为125÷5。method必须scale_both。不教倒数、不将除以0.5转换为乘2，不把这种捷径作为解释。"
+      },
+      {
+        "slot": "visibleSteps",
+        "text": "有可见步骤或口述计算，先承接已有正确部分；已经转换成整数就不退回让他重新估大估小。商不变理由未说明只限制理解结论，不规定每轮必须先追问理由；先接住当前计算、检验或澄清请求。不能只背口诀就宣布理解。"
+      },
+      {
+        "slot": "wrongQuotient",
+        "text": "若出现可核对的整数除法错商，先检查商的每一位是否有计算依据。零可能多余，不能问‘零该放在哪一位’暗示必须保留或挪动零；可核对这个零是否需要。不直接报正确商；如果本轮已自行修正，不能继续批评旧图错误。"
+      },
+      {
+        "slot": "progress",
+        "text": "宿主已核对的理解证据=transformation、verify；本轮focus允许invariance或return。transformation=同时变换两个数；invariance=为什么同时扩大后商不变；place_value=尝试整数计算或核对商的位值；verify=孩子选择办法核验；return=交还独立尝试。未解决证据不是强制提问顺序。"
+      },
+      {
+        "slot": "focusChoice",
+        "text": ""
+      },
+      {
+        "slot": "transformationChoice",
+        "text": ""
+      },
+      {
+        "slot": "calculationSteps",
+        "text": ""
+      },
+      {
+        "slot": "operationCheck",
+        "text": ""
+      },
+      {
+        "slot": "verifiedWithoutReason",
+        "text": "计算已经核对一致但理由证据不足。孩子没有主动追问理由时选择return，简短交还独立尝试；不强迫再讲理由，不说已经懂了。不将这次交还当作完成理解验收。"
+      },
+      {
+        "slot": "withholdAnswer",
+        "text": ""
+      },
+      {
+        "slot": "inviteCalculation",
+        "text": ""
+      },
+      {
+        "slot": "transfer",
+        "text": ""
+      },
+      {
+        "slot": "reported",
+        "text": "孩子最近报告的商=25；‘我改成某数’在这段计算上下文中是改商，不是把除数或被除数改成该数。不得混淆数学角色。"
+      },
+      {
+        "slot": "quantityMeaning",
+        "text": "解释商不变时，总量和每份同时乘同一倍数，组数不变。不能说‘份数整体放大而每份大小没变’；换计数单位时真实数量未改变，但两边记录的数一起变了。"
+      },
+      {
+        "slot": "transformation",
+        "text": "transformation且review：只指出孩子两边变化不同，问另一边准备如何处理；不能直接替他说完整的转换式。hint也只给一处小动作，不一口气选倍数、改两数再列式。"
+      },
+      {
+        "slot": "checkInvitation",
+        "text": "孩子有结果后邀请用乘法检验：商×除数是否回到被除数。这不是除以0.5改乘2。孩子自己说明理由并完成检验后，交还独立尝试或提出一道同类小数除法检验迁移，不提供新题解答，不宣布掌握或标签化。"
+      },
+      {
+        "slot": "verify",
+        "text": "verify焦点下：review先问孩子自己想用什么办法检验，不能指定乘法算式替他选方法；hint权限才可以提醒商乘除数，仍由孩子计算。"
+      },
+      {
+        "slot": "operationAction",
+        "text": ""
+      }
+    ]
+  }
+]

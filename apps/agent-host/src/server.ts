@@ -16,10 +16,14 @@ import { CHILD_LISTEN, PARENT_LISTEN, createParentChannel, loadParentToken } fro
 import { registerGrowthRoutes } from "./growth-routes.js";
 import { registerDrawingRoutes } from "./drawing-routes.js";
 import { startRetentionJob } from "./retention-job.js";
+import { loadPiConfig, type PiConfig } from "./ai/config.js";
+import { PiTeachingBridge, type PiRunner } from "./ai/pi-bridge.js";
+import { createPiRunner } from "./ai/pi-runner.js";
 export { CHILD_LISTEN, PARENT_LISTEN } from "./parent-channel.js";
 
 export interface HostServerOptions {
-  bridge: "parent" | "scripted";
+  bridge: "parent" | "scripted" | "pi";
+  pi?: { config: PiConfig; runner?: PiRunner } | undefined;
   script?: ReplayScript | undefined;
   /** null = 内存库（测试）；undefined = 默认 ~/.ai-scholar */
   dataDir?: string | null | undefined;
@@ -49,6 +53,8 @@ function openStore(dataDir: string | null | undefined): { store: SessionStore; d
 }
 
 export async function buildHostServers(options: HostServerOptions) {
+  // 缺少明确模型时启动失败，不悄悄继承个人 Pi 默认模型或回退脚本。
+  const piRunner = options.bridge === "pi" ? options.pi?.runner ?? createPiRunner(options.pi?.config ?? loadPiConfig()) : null;
   const app = Fastify({ logger: { level: "info" } });
   const parentApp = createParentChannel(options.parentToken ?? loadParentToken());
   await app.register(websocket);
@@ -61,7 +67,8 @@ export async function buildHostServers(options: HostServerOptions) {
   const host = createSessionHost({
     plugin: mathPlugin, store, clock,
     learnerId: "child-1", ledger: ledger?.sessionPort(), assent: ledger?.assentPort(),
-    makeBridge: (sessionId) => (options.bridge === "parent" ? host.parentBridge(sessionId) : new ScriptedReplayBridge(options.script ?? { scriptVersion: 1, turns: [] })),
+    makeBridge: (sessionId) => options.bridge === "pi" ? new PiTeachingBridge(piRunner!) :
+      options.bridge === "parent" ? host.parentBridge(sessionId) : new ScriptedReplayBridge(options.script ?? { scriptVersion: 1, turns: [] }),
   });
   const detachDeletion = ledger?.onDeletion(ids => host.invalidate(ids));
   // 静态品牌随页面内嵌，不新增免鉴权资源路由，也不向外网请求素材。
@@ -117,7 +124,8 @@ export async function buildHostServer(options: HostServerOptions) {
 }
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop() ?? "")) {
-  const bridge = process.argv.includes("--scripted") ? "scripted" : "parent";
+  if (process.argv.includes("--pi") && process.argv.includes("--scripted")) throw new Error("--pi 与 --scripted 不能同时指定");
+  const bridge = process.argv.includes("--pi") ? "pi" : process.argv.includes("--scripted") ? "scripted" : "parent";
   const scriptIndex = process.argv.indexOf("--script");
   const script = scriptIndex >= 0 ? (JSON.parse(readFileSync(process.argv[scriptIndex + 1] ?? "", "utf8")) as ReplayScript) : undefined;
   const { childApp, parentApp } = await buildHostServers({ bridge, script });

@@ -38,6 +38,9 @@ importers:
       fastify:
         specifier: ^5.12.3
         version: 5.12.3
+      ws:
+        specifier: ^8.18.0
+        version: 8.21.3
       zod:
         specifier: ^4.5.4
         version: 4.5.4
@@ -45,9 +48,6 @@ importers:
       '@types/ws':
         specifier: ^8.18.0
         version: 8.18.1
-      ws:
-        specifier: ^8.18.0
-        version: 8.21.3
 
   apps/gate-server:
     dependencies:

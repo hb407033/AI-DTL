@@ -13,6 +13,42 @@ const frame = (id: string, clientSeq: number, payload: unknown) => JSON.stringif
 const scripted = () => new ScriptedReplayBridge({ scriptVersion: 1, turns: [] });
 
 describe("会话网关", () => {
+  test.each([true, false])("人工教师闭环：一级提示、讲回、迁移（成功=%s），失败可结束且不宣布掌握", async succeeds => {
+    const store = new InMemorySessionStore();
+    const host = createSessionHost({ plugin: mathPlugin, store, makeBridge: id => host.parentBridge(id), clock: () => 5 });
+    const pushed: ServerFrame[] = [];
+    let seq = 0;
+    try {
+      await host.open("s-1");
+      host.subscribe("s-1", frames => pushed.push(...frames));
+      const send = async (payload: unknown, wait = true) => {
+        seq++;
+        expect((await host.handleFrame("s-1", frame(`flow-${seq}`, seq, payload), 10 + seq))[0]).toMatchObject({ type: "ack" });
+        if (wait) await host.idle("s-1");
+      };
+      await send({ type: "HELP_REQUEST" }, false);
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(host.parentView("s-1").pending).toMatchObject({ purpose: "hint", allowedMaxHintLevel: 1 });
+      host.submitParentProposal("s-1", { spokenResponse: "你现在已经确定了什么？", learnerTask: "说说已经确定的部分", hintLevel: 1 });
+      await host.idle("s-1");
+      expect(host.parentView("s-1").hintLevel).toBe(1);
+      await send({ type: "UTTERANCE", text: "结果会变小" });
+      expect(host.parentView("s-1")).toMatchObject({ state: "INDEPENDENT", hintLevel: 0 });
+      await send({ type: "DONE" });
+      expect(host.parentView("s-1").state).toBe("EXPLAIN_BACK");
+      await send({ type: "EXPLAIN", text: "因为0.3是十分之三，所以结果变小" });
+      expect(host.parentView("s-1")).toMatchObject({ state: "TRANSFER", hintLevel: 0 });
+      await send({ type: "ANSWER", text: succeeds ? "1.4" : "14" });
+      if (!succeeds) {
+        expect(host.parentView("s-1").state).toBe("SOFT_LANDING");
+        expect(pushed.some(f => f.type === "outbound" && f.message.type === "softLanding")).toBe(true);
+        await send({ type: "SOFT_LANDING_CHOICE", choice: "stop" });
+      }
+      expect(host.parentView("s-1").state).toBe("COMPLETED");
+      expect(store.listEvents("s-1")).toHaveLength(seq);
+    } finally { host.dispose(); }
+  });
+
   test("首次打开会话返回初始出站消息；事件帧立即 ack，教学输出随后经订阅推送；非法 JSON 与未知类型返回 error", async () => {
     const host = createSessionHost({ plugin: mathPlugin, store: new InMemorySessionStore(), makeBridge: scripted, clock: () => 5 });
     const opened = await host.open("s-1");
