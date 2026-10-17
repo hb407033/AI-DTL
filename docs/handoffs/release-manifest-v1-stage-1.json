@@ -1,0 +1,12 @@
+{
+  "stage": "v1-stage-1",
+  "sourceHead": "e2a14d1e43446c3e9c85b96dbd7693616b22219c",
+  "dirty": true,
+  "sourceFingerprint": "0ecaaccecd4a13db33ea54e97aeb58dae7f4f6c1e3f385e084be923e80a1a97e",
+  "hostPort": 8791,
+  "appBundleId": "com.houbin.aischolar.pad",
+  "model": "unknown",
+  "limitations": [
+    "half-duplex"
+  ]
+}

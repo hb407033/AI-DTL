@@ -10,6 +10,8 @@ xcuserdata/
 # 真实家庭结果只留本地（录音、PCM、笔迹、家庭环境信息一律不入库）
 validation/results/*
 !validation/results/.gitkeep
+# 验收截图含真机画面，只留本地；交接文档里的路径指向本机副本
+docs/handoffs/evidence/
 
 # 会话工作目录与本机快照
 .superpowers/
