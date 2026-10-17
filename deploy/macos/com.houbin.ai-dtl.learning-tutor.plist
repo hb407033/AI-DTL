@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.houbin.ai-dtl.learning-tutor</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>/Users/hb-mini/Documents/Codex/2026-08-29/wo-yo/scripts/run-learning-host.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/hb-mini/Documents/Codex/2026-08-29/wo-yo</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/hb-mini/Library/Logs/ai-dtl/learning-tutor.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/hb-mini/Library/Logs/ai-dtl/learning-tutor.err.log</string>
+</dict>
+</plist>
