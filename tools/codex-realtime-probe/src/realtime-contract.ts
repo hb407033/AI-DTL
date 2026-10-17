@@ -1,11 +1,12 @@
 // 与本机 Codex 版本严格绑定的最小实验协议契约。只定义本探针实际用到的请求与通知，不复制整份协议。
-// 依据：OpenAI Codex 仓库标签 rust-v0.153.4 的 codex-rs/app-server-protocol/src/protocol/v2/realtime.rs、account.rs
-// 与 codex-rs/protocol/src/protocol.rs（2026-09-06 核对）。版本变化先阻断、重校本文件，再运行探针。
+// 依据：本机 0.154.0 generate-json-schema（含 --experimental 请求参数）的最小字段核对，
+// 2026-09-13：start、appendText/Audio、stop、通知的必填字段仍兼容；不推断账户具备实时权限。
+// 版本变化先阻断、重校本文件，再运行探针。
 import { z } from "zod";
 
-export const CODEX_VERSION = "0.153.4";
-export const CODEX_SOURCE_TAG = "rust-v0.153.4";
-export const V2_SCHEMA_SHA256 = "d3eace08be5dca386bfd1f1e8df650058b4113f1e10870a284d775d75517576a";
+export const CODEX_VERSION = "0.154.0";
+export const CODEX_SOURCE_TAG = "rust-v0.154.0";
+export const V2_SCHEMA_SHA256 = "f3487938786b729cb6773dbc9e83a7efab9c78c845db7094e8f539f373cbacc9";
 
 // account/read
 export const accountSchema = z.discriminatedUnion("type", [
