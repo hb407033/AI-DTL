@@ -1,0 +1,18 @@
+{
+  "camera": {
+    "problemId": "problem-camera", "source": "camera", "photoId": "photo-1",
+    "curriculum": { "edition": "人教版", "grade": 5, "term": "上", "currentUnit": "小数乘法" },
+    "statement": { "text": "每米彩带 2.4 元，买 0.3 米需要多少元？", "revision": 0, "confirmed": false }
+  },
+  "curated": {
+    "problemId": "problem-curated", "source": "curated", "challengeId": "fraction-compare-01", "packVersion": "fraction-pack-2026-09-17-v1",
+    "curriculum": { "edition": "人教版", "grade": 5, "term": "上", "currentUnit": "家长确认的复习任务" },
+    "statement": { "text": "同样大的纸分别涂 3/4 和 2/3，哪张更多？", "revision": 0, "confirmed": true }
+  },
+  "emptyRecord": {
+    "schemaVersion": 2, "sessionId": "session-fixture", "eventId": "event-initial", "revision": 0,
+    "problem": null, "phase": "confirming", "childInkBase64": "", "board": { "revision": 0, "rectangles": [] },
+    "submissions": [], "feedback": [], "openQuestions": []
+  },
+  "actions": ["express", "clarify", "review", "help", "correct", "uncertain"]
+}

@@ -115,13 +115,15 @@ function classifyProbeOutcome(probe: DiscriminatingProbe, text: string): string 
   }
 }
 
+export const MATH_THINKING_MOVES = ["understand", "represent", "specialize", "vary", "conjecture", "use_data", "justify", "look_back"] as const;
+
 export const mathPlugin: DisciplinePlugin = {
   manifest: {
     id: "math",
     displayName: "数学心智插件",
     version: "0.1.0",
     semanticObjectKinds: ["tenthsBar", "numberLine", "label", "arrow", "highlight", "areaModel"],
-    thinkingMoves: ["conjecture", "model", "experiment", "argue", "verify", "transfer"],
+    thinkingMoves: [...MATH_THINKING_MOVES],
     artifactTypes: ["canvas", "explainBack"],
     curriculumVersions: ["人教版五上/小数乘法"],
     difficultyBands: ["lower", "base", "upper"],

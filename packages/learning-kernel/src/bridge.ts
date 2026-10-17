@@ -1,6 +1,6 @@
 // packages/learning-kernel/src/bridge.ts
 // RealtimeBridge（设计稿 10.8、11.3）：内核只认这个接口。三种实现输出同一个 TeachingProposal；
-// 只有 codex 是 AI 模型路径，scripted 与 parent 不生成内容、不冒充在线。Codex 协议字段不得出现在这里。
+// codex/pi 是模型路径，scripted 与 parent 不冒充在线。供应商协议字段不得出现在这里。
 import type { EvidenceEvent, TeachingProposal } from "@ai-scholar/session-contracts";
 import type { DisciplineEvidence, LearningChallenge } from "./challenge.js";
 import type { SessionState } from "./session-state.js";
@@ -22,7 +22,7 @@ export interface TurnContext {
 }
 
 export interface RealtimeBridge {
-  readonly kind: "codex" | "scripted" | "parent";
+  readonly kind: "codex" | "pi" | "scripted" | "parent";
   start(sessionId: string): Promise<void>;
   requestProposal(turn: TurnContext): Promise<TeachingProposal>;
   stop(): Promise<void>;

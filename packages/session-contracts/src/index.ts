@@ -2,3 +2,7 @@
 export * from "./evidence-event.js";
 export * from "./teaching-proposal.js";
 export * from "./child-protocol.js";
+export * from "./fraction-learning.js";
+export * from "./workspace-learning.js";
+export * from "./inquiry-journal.js";
+export * from "./line-scaffold.js";

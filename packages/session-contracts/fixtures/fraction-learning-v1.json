@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "sessionId": "fixture-session",
+  "envelopes": [
+    { "schemaVersion": 1, "sessionId": "fixture-session", "eventId": "event-1", "submissionId": "submission-1", "revision": 3, "type": "submit", "payload": { "challengeId": "fraction-compare-01", "boardRevision": 3 } },
+    { "schemaVersion": 1, "sessionId": "fixture-session", "eventId": "event-2", "revision": 4, "type": "requestHelp", "payload": { "challengeId": "fraction-compare-01" } },
+    { "schemaVersion": 1, "sessionId": "fixture-session", "eventId": "event-3", "revision": 5, "type": "contest", "payload": { "feedbackId": "feedback-1" } },
+    { "schemaVersion": 1, "sessionId": "fixture-session", "eventId": "event-4", "revision": 6, "type": "startTransfer", "payload": { "challengeId": "fraction-transfer-01" } },
+    { "schemaVersion": 1, "sessionId": "fixture-session", "eventId": "event-5", "revision": 7, "type": "pause", "payload": {} },
+    { "schemaVersion": 1, "sessionId": "fixture-session", "eventId": "event-6", "revision": 8, "type": "resume", "payload": {} },
+    { "schemaVersion": 1, "sessionId": "fixture-session", "eventId": "event-7", "revision": 9, "type": "finishSession", "payload": { "reason": "rest" } }
+  ],
+  "rectangles": [
+    { "id": "rect-child-1", "wholeGroupId": "whole-1", "rows": 3, "columns": 4, "shadedCells": [0, 1, 2, 3, 4, 5, 6, 7, 8], "owner": "child" },
+    { "id": "rect-child-2", "wholeGroupId": "whole-1", "rows": 3, "columns": 4, "shadedCells": [0, 1, 2, 3, 4, 5, 6, 7], "owner": "child" },
+    { "id": "rect-agent-1", "wholeGroupId": "whole-2", "rows": 1, "columns": 2, "shadedCells": [0], "owner": "agent" }
+  ],
+  "boardStates": [
+    {
+      "revision": 3,
+      "rectangles": [
+        { "id": "rect-child-1", "wholeGroupId": "whole-1", "rows": 3, "columns": 4, "shadedCells": [0, 1, 2, 3, 4, 5, 6, 7, 8], "owner": "child" },
+        { "id": "rect-child-2", "wholeGroupId": "whole-1", "rows": 3, "columns": 4, "shadedCells": [0, 1, 2, 3, 4, 5, 6, 7], "owner": "child" },
+        { "id": "rect-agent-1", "wholeGroupId": "whole-2", "rows": 1, "columns": 2, "shadedCells": [0], "owner": "agent" }
+      ]
+    }
+  ],
+  "submissions": [
+    { "submissionId": "submission-9", "challengeId": "fraction-transfer-01", "boardRevision": 2, "hintUsed": true }
+  ],
+  "invalid": {
+    "cellOutOfRange": { "id": "r-bad-1", "wholeGroupId": "w", "rows": 2, "columns": 2, "shadedCells": [4], "owner": "child" },
+    "duplicateCell": { "id": "r-bad-2", "wholeGroupId": "w", "rows": 2, "columns": 2, "shadedCells": [1, 1], "owner": "child" },
+    "tooManyCells": { "id": "r-bad-3", "wholeGroupId": "w", "rows": 8, "columns": 8, "shadedCells": [], "owner": "child" },
+    "zeroRows": { "id": "r-bad-4", "wholeGroupId": "w", "rows": 0, "columns": 4, "shadedCells": [], "owner": "child" },
+    "illegalOwner": { "id": "r-bad-5", "wholeGroupId": "w", "rows": 2, "columns": 2, "shadedCells": [0], "owner": "teacher" },
+    "tooManyChildRectangles": {
+      "revision": 0,
+      "rectangles": [
+        { "id": "c1", "wholeGroupId": "w", "rows": 1, "columns": 2, "shadedCells": [], "owner": "child" },
+        { "id": "c2", "wholeGroupId": "w", "rows": 1, "columns": 2, "shadedCells": [], "owner": "child" },
+        { "id": "c3", "wholeGroupId": "w", "rows": 1, "columns": 2, "shadedCells": [], "owner": "child" },
+        { "id": "c4", "wholeGroupId": "w", "rows": 1, "columns": 2, "shadedCells": [], "owner": "child" },
+        { "id": "c5", "wholeGroupId": "w", "rows": 1, "columns": 2, "shadedCells": [], "owner": "child" }
+      ]
+    },
+    "duplicateRectangleIds": {
+      "revision": 0,
+      "rectangles": [
+        { "id": "dup", "wholeGroupId": "w", "rows": 1, "columns": 2, "shadedCells": [], "owner": "child" },
+        { "id": "dup", "wholeGroupId": "w", "rows": 1, "columns": 3, "shadedCells": [], "owner": "agent" }
+      ]
+    },
+    "unknownCommand": { "schemaVersion": 1, "sessionId": "fixture-session", "eventId": "event-x", "revision": 0, "type": "eraseChildInk", "payload": {} },
+    "wrongSchemaVersion": { "schemaVersion": 2, "sessionId": "fixture-session", "eventId": "event-y", "revision": 0, "type": "pause", "payload": {} },
+    "staleRevision": { "schemaVersion": 1, "sessionId": "fixture-session", "eventId": "event-old", "revision": 1, "type": "pause", "payload": {} }
+  }
+}
