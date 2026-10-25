@@ -450,3 +450,17 @@ tools/sim-child-turn.sh "$DIR/acceptance" plant 0 "六十除以五等于十二�
 - 真机复验第一次第3轮作废：两问被拒后，删问句的编辑器带进新数（"1 千克"）被判 `unsafeQuestionEdit`。改为编辑越界时不采用编辑稿，宿主在原稿上只删问句再走全部门禁（原"越界即整轮作废"的测试同步改为断言新行为）。宿主 552/552。
 - 真机复验第二次：7/7、0 作废、无口诀；求助从更简单的数（"1千克4元买半千克"）到"0.4千克里有几个0.1千克"，孩子自己算出 1.44 元，交还。
 - 部署：mini 切到 v14 `runtime/2026-10-16-teaching-v14/learning-tutor-teaching-v14.mjs`（SHA256 前缀 `90dca2e8efe2`，40 个源文件一致，不含配置和凭据），PID 20899；家庭作品 13 个文件前后一致；备份 `/tmp/ai-dtl-teaching-v14.1Vw50g`，v13 保留可回退。验收服务已停，iPad 测试实例已结束。
+
+## 第十五批：App 打不开与 mini 服务停摆（2026-10-25）
+
+**App 打不开**：免费个人团队描述文件 10/23 到期。Xcode 里已无账号（`DVTDeveloperAccountManagerAppleIDLists` 为空），用户在 Xcode → Settings → Accounts 重新登录后，以 Release 配置重签安装（不含 DEBUG 测试钩子，同一 Bundle ID，数据保留）。重新登录换了开发证书，需在 iPad「设置→通用→VPN与设备管理」重新信任。新描述文件到期 **2026-11-01**。
+
+**桌面图标**：新增 `Assets.xcassets/AppIcon.appiconset`（1024 单尺寸），由 `tools/make-app-icon.swift` 从横版 Logo 按透明通道裁出左侧"D + 书本"图形，原样居中放在白底方形上；`project.yml` 设 `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon`；品牌规范已同步。
+
+**mini 服务停摆**（App 能开但连不上老师）
+- mini 约 10/21 重启，手动起的 v14 随之消失。
+- 开机配置跑 `~/Documents/.../scripts/run-learning-host.sh`，launchd 进程读不了 `~/Documents`（TCC，`Operation not permitted`，退出码 126），4 天里每 10 秒失败一次。
+- 10/25 12:08 有人用 Homebrew 装了 `node@24`，顺带把 simdjson 升到 5.0.5，Homebrew 的 node 26 因缺 `libsimdjson.33.dylib` 无法启动。
+- 修复（用户确认后）：`.env.ai.local` 复制到 `~/Library/Application Support/ai-dtl/`（600）；开机配置改为用 nvm 固定的 node v22.22.3 直接运行 Application Support 里的 v14 包，工作目录也在 Application Support，不再依赖 `~/Documents` 和 Homebrew。仓库模板 `deploy/macos/com.houbin.ai-dtl.learning-tutor.plist` 同步。
+- 验证：`kill -9` 后 launchd 2 秒内自动拉起，healthz 正常、主机 ID 不变；家庭作品 30 个文件前后一致；旧配置和 7.7MB 失败日志在 `/tmp/ai-dtl-launchd.Qr8ccp/`。
+- 以后换版本：改开机配置第三个参数的包路径，然后 `launchctl bootout` + `bootstrap`。
