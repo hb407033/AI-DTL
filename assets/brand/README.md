@@ -10,7 +10,7 @@
 
 仓库首页、家长控制台、原生儿童端及设备联调端采用同一份原图。Web 由宿主内嵌原图，不加载第三方素材或增加免鉴权数据路由。原生工程引用仓库统一资源，并通过打包测试核对，避免只有开发目录有图、安装后丢图。
 
-此次使用横版原图，没有新增原工程中不存在的方形 AppIcon；应用内 Logo 与桌面显示名称已统一。方形图标需要独立的品牌适配，不用拉伸横版 Logo 代替。
+应用内 Logo 使用横版原图。iPad 桌面图标（`apps/ipad/ScholarPad/ScholarPad/Assets.xcassets/AppIcon.appiconset`）由 `swift tools/make-app-icon.swift assets/brand/ai-dtl-logo.png <输出.png>` 生成：从原图按透明通道裁出左侧“D + 书本”图形，原样（不拉伸、不改色、不描摹）居中放在 1024 × 1024 白底上，文字部分由桌面显示名称“AI-DTL”承担。
 
 ## 品牌名与工程标识分离
 

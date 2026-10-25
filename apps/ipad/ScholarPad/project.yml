@@ -46,6 +46,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.houbin.aischolar.pad
+        # 方形图标由 tools/make-app-icon.swift 从横版 Logo 裁出左侧图形生成，不拉伸、不改色。
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
   ScholarPadUITests:
     type: bundle.ui-testing
     platform: iOS
