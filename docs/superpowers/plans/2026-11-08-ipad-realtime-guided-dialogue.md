@@ -62,10 +62,10 @@
 **Interfaces:**
 - Produces: 文档中的两个数 `connectReadyMs`（p50/p90，各 10 次）与 `idleTimeoutSec`，供 Task 8 的默认值核对（设计稿预设 90 秒空闲关闭；若实测云端超时 < 90 秒，Task 8 用实测值减 10 秒）。
 
-- [ ] **Step 1: 写探针脚本**：用 `WorkspaceVoiceProvider` 同样的握手（`session.created` → `session.update` → `session.updated`），用 `performance.now()` 记 10 次从 `new WebSocket` 到 `session.updated` 的毫秒；然后建一条连接不发任何音频，每 15 秒记一次 `readyState`，直到收到 close，记录秒数（上限 10 分钟）。
-- [ ] **Step 2: 在本机运行**：`node --env-file=.env.ai.local --import tsx apps/agent-host/scripts/measure-realtime-connect.ts`。预期打印 JSON `{connectReadyMs:{p50,p90,samples:[…]}, idleTimeoutSec}`。
+- [x] **Step 1: 写探针脚本**：用 `WorkspaceVoiceProvider` 同样的握手（`session.created` → `session.update` → `session.updated`），用 `performance.now()` 记 10 次从 `new WebSocket` 到 `session.updated` 的毫秒；然后建一条连接不发任何音频，每 15 秒记一次 `readyState`，直到收到 close，记录秒数（上限 10 分钟）。
+- [x] **Step 2: 在本机运行**：`node --env-file=.env.ai.local --import tsx apps/agent-host/scripts/measure-realtime-connect.ts`。预期打印 JSON `{connectReadyMs:{p50,p90,samples:[…]}, idleTimeoutSec}`。
 - [ ] **Step 3: 在 mini 上再跑一次**（家里网络），两组结果写入文档。
-- [ ] **Step 4: Commit** `git add apps/agent-host/scripts/measure-realtime-connect.ts docs/handoffs/2026-11-08-realtime-connect-measurements.md`
+- [x] **Step 4: Commit** `git add apps/agent-host/scripts/measure-realtime-connect.ts docs/handoffs/2026-11-08-realtime-connect-measurements.md`
 
 ### Task 2: 纯规则入口与 JS 包
 
@@ -87,15 +87,15 @@
   - `decideSlow(contextJson: string, rejectedReason: string, hooks: {requestText(instructions: string, imageBase64: string|null): Promise<string>; speak(text: string): Promise<{ok: boolean, spoken: string}>}): Promise<string>` → `{"ok":true,"utterance":string}` 或 `{"ok":false,"code":string}`。内部 `new QwenTeachingDecisionProvider(config占位, undefined, requestTextAdapter).decide(input)`，再用 `hooks.speak` 合成并 `matchesSpeech` 核对。
 - 样例文件格式：`[{name, draft, context, expect:{ok, reason?}}]`，30 条，从 `test/workspace-teaching-decision.test.ts` 现有用例中抽取（抢答、口诀、多问、断言孩子写的数、重复上问、字数、正常通过各若干）。
 
-- [ ] **Step 1: 写样例文件**（30 条）。
-- [ ] **Step 2: 写失败测试** `teaching-gates-bundle.test.ts`：
+- [x] **Step 1: 写样例文件**（30 条）。
+- [x] **Step 2: 写失败测试** `teaching-gates-bundle.test.ts`：
   - `test("JS 包在没有 Buffer/require/fetch 的 vm 里对 30 条样例的判断与直接调用一致")`：用 `tools/build-teaching-gates-bundle.mjs` 导出的 `buildTeachingGates(outfile)` 构建到临时目录，`new vm.Script(code).runInNewContext({})`，对每条样例比较 `JSON.parse(ctx.TeachingGates.checkDraft(...))` 与直接 `validateTeachingDecision` 的结果。
   - `test("JS 包不含网络代码与密钥字样")`：断言包内不出现 `"ws"`、`WebSocket(`、`apiKey`、`wss://`。
   - `test("decideSlow 走注入的 requestText，不自己联网")`：hooks 记录调用，返回合法决策 JSON，断言 `ok:true` 且 `requestText` 被调用。
-- [ ] **Step 3: 运行，确认失败**：`npx vitest run test/teaching-gates-bundle.test.ts`，预期 "Cannot find module teaching-gates-entry"。
-- [ ] **Step 4: 实现 `teaching-gates-entry.ts`**，并在 `build-teaching-gates-bundle.mjs` 中：esbuild `format:"iife"`, `globalName:"TeachingGates"`, `platform:"neutral"`, `target:"es2020"`，`alias` 把 `./qwen-workspace-session.js`、`./qwen-thinking-text.js`、`ws`、`node:crypto` 指到一个抛 `Error("networkUnavailableInGates")` 的 stub；manifest 写 `sourceHashes` 与 `bundleSha256`。导出 `buildTeachingGates(outfile)` 供测试复用；作为脚本运行时写到 iPad 的 `Session/Gates/`。
-- [ ] **Step 5: `speakDecision` 改 `Uint8Array`**（`Buffer.alloc(6400)` → `new Uint8Array(6400)`；`chunks: Uint8Array[]`），跑全量 `npx vitest run`，预期 561+3 通过。
-- [ ] **Step 6: Commit** `git add apps/agent-host/src/ai/teaching-gates-entry.ts apps/agent-host/src/ai/workspace-teaching-decision.ts tools/build-teaching-gates-bundle.mjs apps/agent-host/test/fixtures/teaching-gates-samples.json apps/agent-host/test/teaching-gates-bundle.test.ts`
+- [x] **Step 3: 运行，确认失败**：`npx vitest run test/teaching-gates-bundle.test.ts`，预期 "Cannot find module teaching-gates-entry"。
+- [x] **Step 4: 实现 `teaching-gates-entry.ts`**，并在 `build-teaching-gates-bundle.mjs` 中：esbuild `format:"iife"`, `globalName:"TeachingGates"`, `platform:"neutral"`, `target:"es2020"`，`alias` 把 `./qwen-workspace-session.js`、`./qwen-thinking-text.js`、`ws`、`node:crypto` 指到一个抛 `Error("networkUnavailableInGates")` 的 stub；manifest 写 `sourceHashes` 与 `bundleSha256`。导出 `buildTeachingGates(outfile)` 供测试复用；作为脚本运行时写到 iPad 的 `Session/Gates/`。
+- [x] **Step 5: `speakDecision` 改 `Uint8Array`**（`Buffer.alloc(6400)` → `new Uint8Array(6400)`；`chunks: Uint8Array[]`），跑全量 `npx vitest run`，预期 561+3 通过。
+- [x] **Step 6: Commit** `git add apps/agent-host/src/ai/teaching-gates-entry.ts apps/agent-host/src/ai/workspace-teaching-decision.ts tools/build-teaching-gates-bundle.mjs apps/agent-host/test/fixtures/teaching-gates-samples.json apps/agent-host/test/teaching-gates-bundle.test.ts`
 
 ### Task 3: iPad 侧 TeachingGates（JavaScriptCore）与头部解析
 
@@ -113,12 +113,12 @@
 - `struct GateVerdict: Equatable { let ok: Bool; let reason: String?; let rewrite: String?; let draftJSON: String? }`（`draftJSON` 通过时带回，供 Task 11 同步决策历史）
 - `struct GateContext: Encodable`：与 Task 2 `contextJson` 字段一致（`record`, `turnId`, `responseId`, `permission`, `child`, `history`, `imageAttached`, `ocrNumbers: [String]`）。
 
-- [ ] **Step 1: 写失败测试** `TurnHeaderTests`：`testParsesHeaderSplitAcrossDeltas`（`{"transcr` + `ipt":"帮我","kind":"help"}` → header(帮我, .help)）、`testStripsJsonFence`、`testTrailingTextIsKeptOutOfHeader`、`testMalformedHeaderReturnsNil`、`testUnknownKindReturnsNil`。
-- [ ] **Step 2: 写失败测试** `TeachingGatesTests`：`testVerdictsMatchSharedSamples`（读 `teaching-gates-samples.json`，逐条 `check`，与 `expect` 比较）、`testMatchesSpeechTreatsChineseDigitsEqual`（"七点七" vs "7.7" → true）。
-- [ ] **Step 3: 运行确认编译失败**（类型不存在）。
-- [ ] **Step 4: 实现两个文件**；`TeachingGates.init` 从 `Bundle.main.url(forResource:"teaching-gates", withExtension:"js")` 加载到 `JSContext`，`exceptionHandler` 转成 Swift 错误。
-- [ ] **Step 5: 运行测试通过**：`-only-testing:ScholarPadTests/TeachingGatesTests -only-testing:ScholarPadTests/TurnHeaderTests`。
-- [ ] **Step 6: Commit**
+- [x] **Step 1: 写失败测试** `TurnHeaderTests`：`testParsesHeaderSplitAcrossDeltas`（`{"transcr` + `ipt":"帮我","kind":"help"}` → header(帮我, .help)）、`testStripsJsonFence`、`testTrailingTextIsKeptOutOfHeader`、`testMalformedHeaderReturnsNil`、`testUnknownKindReturnsNil`。
+- [x] **Step 2: 写失败测试** `TeachingGatesTests`：`testVerdictsMatchSharedSamples`（读 `teaching-gates-samples.json`，逐条 `check`，与 `expect` 比较）、`testMatchesSpeechTreatsChineseDigitsEqual`（"七点七" vs "7.7" → true）。
+- [x] **Step 3: 运行确认编译失败**（类型不存在）。
+- [x] **Step 4: 实现两个文件**；`TeachingGates.init` 从 `Bundle.main.url(forResource:"teaching-gates", withExtension:"js")` 加载到 `JSContext`，`exceptionHandler` 转成 Swift 错误。
+- [x] **Step 5: 运行测试通过**：`-only-testing:ScholarPadTests/TeachingGatesTests -only-testing:ScholarPadTests/TurnHeaderTests`。
+- [x] **Step 6: Commit**
 
 ### Task 4: RealtimeSession（预热、边说边传、取消、重建）
 
@@ -134,10 +134,10 @@
 - 协议细节沿用 `workspace-voice-provider.ts`：`session.update{modalities:["text","audio"], voice:"Tina", turn_detection:null, audio:{input pcm 16000, output pcm 24000}, instructions}`；`input_audio_buffer.append{audio:base64}`、`input_image_buffer.append{image}`、`input_audio_buffer.commit`、`response.create{response:{modalities:["text"],instructions}}`（头部）与 `response.create{response:{modalities:["text","audio"],instructions}}`（回答）、`response.cancel`；入站 `response.text.delta|response.audio_transcript.delta`、`response.audio.delta`、`response.done`。
 - 行为：`appendAudio` 在 `connecting` 时缓存在内存队列（最多 60 秒音频，超出丢最旧并记日志），`ready` 后按入队顺序补发；`commitTurn` 等待缓存清空后再发 commit；`close()` 清空缓存（不落盘）。
 
-- [ ] **Step 1: 写失败测试**：`testAudioSentBeforeReadyIsFlushedInOrderAfterSessionUpdated`、`testCommitWaitsUntilBufferedFramesFlushed`、`testHeaderRequestIsTextOnlyAndReplyRequestHasAudio`、`testCancelSendsResponseCancelAndDropsLaterAudioOfThatResponse`、`testCloseDiscardsBufferedAudioAndReportsReason`、`testPrewarmTwiceReusesReadyConnection`。
-- [ ] **Step 2: 运行确认失败。**
-- [ ] **Step 3: 实现 `RealtimeSession`**；`URLRequest` 头 `Authorization: Bearer <apiKey>`（密钥只在内存）。
-- [ ] **Step 4: 测试通过；Commit。**
+- [x] **Step 1: 写失败测试**：`testAudioSentBeforeReadyIsFlushedInOrderAfterSessionUpdated`、`testCommitWaitsUntilBufferedFramesFlushed`、`testHeaderRequestIsTextOnlyAndReplyRequestHasAudio`、`testCancelSendsResponseCancelAndDropsLaterAudioOfThatResponse`、`testCloseDiscardsBufferedAudioAndReportsReason`、`testPrewarmTwiceReusesReadyConnection`。
+- [x] **Step 2: 运行确认失败。**
+- [x] **Step 3: 实现 `RealtimeSession`**；`URLRequest` 头 `Authorization: Bearer <apiKey>`（密钥只在内存）。
+- [x] **Step 4: 测试通过；Commit。**
 
 ### Task 5: TutorConductor 快路径（混合节奏）
 
@@ -153,8 +153,8 @@
 - 快路径规则：`childFinishedSpeaking` → `commitTurn` → `requestHeader(gates.headerInstructions())`；header 到达后：`idea|selfTalk` → 不发第二次响应，`audio.say(应答)` 轮换四句（复用 `WorkspaceClient.acknowledgements`），记录 `path:"none"`；`finish` → 记录并由上层结束对话；`help|question` → 若 `context().inkChanged` 则先 `attachImage(context().canvasJPEG)`，再 `requestReply(gates.replyInstructions(kind:))`，`audio.say` 一句应答的同时缓冲 `onAudioDelta` 与文字，`onResponseDone` 后 `gates.check(utterance: 文字)`；`ok` → `beginResponse/play.../completeResponse`，`played:true`；否则交给 Task 7 的慢路径回调 `onNeedsSlowPath(utterance, reason)`。头部响应的文字永远不进播放，也不进 `messages`。
 - `GateContext` 增加 `inkChanged: Bool` 与 `canvasJPEG: Data?`（照片只在有新笔迹时附，设计稿 4.3）。
 
-- [ ] **Step 1: 写失败测试**：`testSelfTalkSendsNoReplyRequestAndAcknowledgesOnly`、`testHeaderTextIsNeverPlayedOrShown`（Review Focus 1）、`testImageAttachedOnlyWhenInkChanged`、`testHelpBuffersAudioUntilDoneThenPlaysWhenGatePasses`（断言 done 之前 `play` 没被调用，之后调用次数 = 音频增量数）、`testGateRejectionDoesNotPlayAndReportsSlowPathRequest`、`testLatencyMeasuredFromChildFinishedToFirstPlay`、`testAcknowledgementRotates`。
-- [ ] **Step 2: 运行确认失败。Step 3: 实现。Step 4: 通过并 Commit。**
+- [x] **Step 1: 写失败测试**：`testSelfTalkSendsNoReplyRequestAndAcknowledgesOnly`、`testHeaderTextIsNeverPlayedOrShown`（Review Focus 1）、`testImageAttachedOnlyWhenInkChanged`、`testHelpBuffersAudioUntilDoneThenPlaysWhenGatePasses`（断言 done 之前 `play` 没被调用，之后调用次数 = 音频增量数）、`testGateRejectionDoesNotPlayAndReportsSlowPathRequest`、`testLatencyMeasuredFromChildFinishedToFirstPlay`、`testAcknowledgementRotates`。
+- [x] **Step 2: 运行确认失败。Step 3: 实现。Step 4: 通过并 Commit。**
 
 ### Task 6: 慢路径（JS `decideSlow` + Swift 网络）
 
@@ -168,8 +168,8 @@
 - 默认 `requestText`：HTTPS 到与 `apps/agent-host/src/ai/qwen-thinking-text.ts` 相同的接口与模型（`qwen3.8-omni-flash`，`reasoning_effort: "medium"`），实现者按该文件照搬请求体；默认 `speak`：用一条临时 `RealtimeSession`（文字+音频，指令 `只逐字读这句话：…`）收集音频与朗读文本。
 - JS 侧 `hooks` 的 Promise 由 Swift 用 `JSValue` 的 resolve/reject 桥接。
 
-- [ ] **Step 1: 写失败测试**：`testRewriteAcceptedWhenGatePassesAndSpeechMatches`（假 requestText 返回合法 JSON，假 speak 返回同文）、`testSpeechNumberMismatchRetriesOnceThenFails`、`testRequestTextErrorYieldsFailedCodeNotCrash`。
-- [ ] **Step 2–4: 失败 → 实现 → 通过 → Commit。**
+- [x] **Step 1: 写失败测试**：`testRewriteAcceptedWhenGatePassesAndSpeechMatches`（假 requestText 返回合法 JSON，假 speak 返回同文）、`testSpeechNumberMismatchRetriesOnceThenFails`、`testRequestTextErrorYieldsFailedCodeNotCrash`。
+- [x] **Step 2–4: 失败 → 实现 → 通过 → Commit。**
 
 ### Task 7: Conductor 接慢路径、失败表、打断
 
@@ -181,8 +181,8 @@
 - `TutorConductor.init` 增加 `slowPath: SlowPath`；新增 `func interrupt()`（孩子在播放中开口：`audio.stopPlayback()`、`session.cancelResponse()`、记录 `interrupted:true` 并把"上一句没说完"放进下一轮 `GateContext.history` 要点）。
 - 失败表（设计稿第 6 段）落实为 `status` 文案与 `audio.say` 文案：连接失败/超时 → "刚才没听清，你再说一遍好吗？"；无 header/文字为空但有声音 → 当 `idea`；快慢都失败 → "老师刚才没想好，你再说一遍好吗？"；语音数字不一致 → 丢弃声音走慢路径。
 
-- [ ] **Step 1: 写失败测试**：`testGateRejectionRunsSlowPathAndPlaysRewrite`、`testSlowPathFailureSpeaksUnsurePrompt`、`testAudioWithoutHeaderIsTreatedAsIdea`（Review Focus 3）、`testConnectionFailureBeforeReadyDropsBufferedAudioAndSpeaksUnheard`（Review Focus 2，断言没有任何录音被写到磁盘：假音频对象记录写入次数为 0）、`testSpeechMismatchGoesSlowPath`、`testInterruptStopsPlaybackAndMarksTurn`。
-- [ ] **Step 2–4: 失败 → 实现 → 通过 → Commit。**
+- [x] **Step 1: 写失败测试**：`testGateRejectionRunsSlowPathAndPlaysRewrite`、`testSlowPathFailureSpeaksUnsurePrompt`、`testAudioWithoutHeaderIsTreatedAsIdea`（Review Focus 3）、`testConnectionFailureBeforeReadyDropsBufferedAudioAndSpeaksUnheard`（Review Focus 2，断言没有任何录音被写到磁盘：假音频对象记录写入次数为 0）、`testSpeechMismatchGoesSlowPath`、`testInterruptStopsPlaybackAndMarksTurn`。
+- [x] **Step 2–4: 失败 → 实现 → 通过 → Commit。**
 
 ### Task 8: 连接生命周期与换会话
 
@@ -195,8 +195,8 @@
 - 行为：`speechStarted` 时若 `current == nil` 或 `.closed` → 新建并 `prewarm`；空闲 ≥ `idleCloseAfter` 且 `!inFlight` → `close()`；`turnCompleted` 计数到 `rotateEveryTurns` 且 `!inFlight` → 下一次 `speechStarted` 前后台建新会话（旧会话播完再关）；`inFlight` 期间绝不关闭或替换 `current`（Review Focus 5）。
 - 默认 `idleCloseAfter` 若 Task 1 实测云端空闲超时 < 100 秒，则改为实测值 − 10。
 
-- [ ] **Step 1: 写失败测试**：`testIdleNinetySecondsCloses`、`testSpeechStartReopensAndPrewarms`、`testRotationAfterEightTurnsCreatesNewSessionBeforeNextSpeech`、`testNoCloseOrRotateWhileTurnInFlight`、`testInstructionsRebuiltWithLatestHighlightsOnRotation`。
-- [ ] **Step 2–4: 失败 → 实现 → 通过 → Commit。**
+- [x] **Step 1: 写失败测试**：`testIdleNinetySecondsCloses`、`testSpeechStartReopensAndPrewarms`、`testRotationAfterEightTurnsCreatesNewSessionBeforeNextSpeech`、`testNoCloseOrRotateWhileTurnInFlight`、`testInstructionsRebuiltWithLatestHighlightsOnRotation`。
+- [x] **Step 2–4: 失败 → 实现 → 通过 → Commit。**
 
 ### Task 9: 老师主动开口与限频
 
@@ -209,8 +209,8 @@
 - `enum ProactiveReason { case idleWithNewInk, newResultNumber(String) }`
 - 触发后由 Conductor 走快路径：附照片，`child` 为空，`permission: "review"`，提示词加一句"孩子停下来了，请只就他刚写的一步问一个问题"。
 
-- [ ] **Step 1: 写失败测试**：`testIdle40sWithNewInkPrompts`、`testIdleWithoutInkDoesNotPrompt`、`testMinIntervalTwoMinutes`、`testMaxThreePerProblemResetsOnProblemChange`、`testNewResultNumberPromptsOnce`。
-- [ ] **Step 2–4: 失败 → 实现 → 通过 → Commit。**
+- [x] **Step 1: 写失败测试**：`testIdle40sWithNewInkPrompts`、`testIdleWithoutInkDoesNotPrompt`、`testMinIntervalTwoMinutes`、`testMaxThreePerProblemResetsOnProblemChange`、`testNewResultNumberPromptsOnce`。
+- [x] **Step 2–4: 失败 → 实现 → 通过 → Commit。**
 
 ### Task 10: mini 接收同步批次（幂等）
 
@@ -225,8 +225,8 @@
 - 实现：`recordSyncBatch` 为 false → 直接 `duplicate`；否则 `store.save(record, expectedRevision, decision)` 逐条决策（第一条带 record，其余 `expectedRevision` 递增），`turns` 追加到 `<id>-turns.jsonl`，`usage` 追加 `usage.jsonl`。
 - `media` 继续走现有 `POST /workspace/:id/media`（按内容哈希去重由 `saveMedia` 现有逻辑负责；若无则本任务加：同哈希返回已有 mediaId）。
 
-- [ ] **Step 1: 写失败测试**：`test("同一 batchId 重放只应用一次")`、`test("版本倒退返回 409 且不写入")`、`test("决策与用量落盘且不含录音字段")`（body 带 `pcm` 字段时 400）。
-- [ ] **Step 2–4: 失败 → 实现 → 通过（全量 vitest）→ Commit。**
+- [x] **Step 1: 写失败测试**：`test("同一 batchId 重放只应用一次")`、`test("版本倒退返回 409 且不写入")`、`test("决策与用量落盘且不含录音字段")`（body 带 `pcm` 字段时 400）。
+- [x] **Step 2–4: 失败 → 实现 → 通过（全量 vitest）→ Commit。**
 
 ### Task 11: iPad SyncOutbox 与接线
 
@@ -241,8 +241,8 @@
 - 持久化：每批一个文件 `<directory>/<sessionId>/<seq>-<batchId>.json`，成功（200）或 `duplicate` 后删除；`409` 停止该会话队列并标记 `conflict`，由现有冲突 UI 处理；其他错误保留、下次 `flush` 重试，按文件名序。
 - `usage` 记录字段与 `workspace-usage.ts` 的 `UsageRecord` 一致，`model` 填 `qwen3.8-omni-flash-realtime`，额外 `latencyMs`、`path`。
 
-- [ ] **Step 1: 写失败测试**：`testBatchesPersistAcrossRelaunchAndFlushInOrder`、`testDuplicateResponseRemovesBatch`（Review Focus 4）、`testConflictStopsSessionQueue`、`testNetworkErrorKeepsBatch`、`testNoRecordingBytesInBatchJSON`。
-- [ ] **Step 2–4: 失败 → 实现 → 通过 → Commit。**
+- [x] **Step 1: 写失败测试**：`testBatchesPersistAcrossRelaunchAndFlushInOrder`、`testDuplicateResponseRemovesBatch`（Review Focus 4）、`testConflictStopsSessionQueue`、`testNetworkErrorKeepsBatch`、`testNoRecordingBytesInBatchJSON`。
+- [x] **Step 2–4: 失败 → 实现 → 通过 → Commit。**
 
 ### Task 12: 密钥领取与家长设置开关
 
@@ -256,8 +256,8 @@
 - mini：`tools/allow-ipad-key-handout.sh` 生成 6 位数字口令写入 `<AppSupport>/key-handout.json {code, expiresAt: now+10min}` 并打印；`POST /workspace/credentials/realtime {code}` → 口令匹配且未过期 → `200 {apiKey, url}` 并删除文件；否则 `403`。只监听局域网（沿用现有 host）。
 - iPad：`struct RealtimeKeyStore { static func load() -> (url: URL, apiKey: String)?; static func save(url: URL, apiKey: String) throws; static func clear(); static func fetch(host: String, code: String) async throws -> Void }`，钥匙串 `kSecAttrService = "com.houbin.aischolar.pad.realtime"`。
 
-- [ ] **Step 1: 写失败测试**：主机 `test("口令正确一次有效，第二次 403")`、`test("过期口令 403")`；iPad `testSaveLoadClearRoundTrip`、`testFetchStoresKeyAndNeverLogsIt`（注入记录器断言日志不含密钥）。
-- [ ] **Step 2–4: 失败 → 实现 → 通过 → Commit。**
+- [x] **Step 1: 写失败测试**：主机 `test("口令正确一次有效，第二次 403")`、`test("过期口令 403")`；iPad `testSaveLoadClearRoundTrip`、`testFetchStoresKeyAndNeverLogsIt`（注入记录器断言日志不含密钥）。
+- [x] **Step 2–4: 失败 → 实现 → 通过 → Commit。**
 
 ### Task 13: 接入界面（开关分流）
 
@@ -270,8 +270,8 @@
 **Interfaces:**
 - 启动参数 `-realtimeMode YES` 与环境 `AI_DTL_REALTIME_FAKE_URL`（指向测试用本地假实时服务，Task 14 提供）供 UI 测试与真机回归。
 
-- [ ] **Step 1: 写 UI 测试** `testRealtimeModeShowsListeningThenSpeakingAndPlaysWithinBudget`：假服务返回 header + 文字 + 音频；断言状态条依次 "正在听你说" → "老师在说话"，`workspaceVoiceStatus` 不含"没听清"。
-- [ ] **Step 2: 实现分流与接线；Step 3: 全量 iPad 单元测试 + 该 UI 测试通过；Step 4: Commit。**
+- [x] **Step 1: 写 UI 测试** `testRealtimeModeShowsListeningThenSpeakingAndPlaysWithinBudget`：假服务返回 header + 文字 + 音频；断言状态条依次 "正在听你说" → "老师在说话"，`workspaceVoiceStatus` 不含"没听清"。
+- [x] **Step 2: 实现分流与接线；Step 3: 全量 iPad 单元测试 + 该 UI 测试通过；Step 4: Commit。**
 
 ### Task 14: 真机回归与对比实验
 
@@ -281,7 +281,7 @@
 - Create: `apps/agent-host/scripts/report-latency-comparison.ts`（读两份 `usage.jsonl`/`turns.jsonl`，输出：说完到出声中位数、慢路径占比、每轮 token、抢答/口诀命中数）
 - Create: `docs/handoffs/2026-11-XX-realtime-vs-v16-comparison.md`
 
-- [ ] **Step 1: 写并跑假实时服务与 UI 测试（Task 13 依赖）。**
+- [x] **Step 1: 写并跑假实时服务与 UI 测试（Task 13 依赖）。**
 - [ ] **Step 2: `CONFIG=Debug tools/install-ipad-company-signed.sh`，用 5 类题（`jiayi` 等现有照片与台词）各跑一遍 `tools/device-realtime-case.sh` 与 `tools/device-teaching-case.sh`。**
 - [ ] **Step 3: 跑 `report-latency-comparison.ts`，四项门槛：中位数 ≤ 4 秒、抢答/口诀 ≤ v16、慢路径 ≤ 30%、token ≤ v16 的 1/2；结果写入交接文档（含失败样本原话）。**
 - [ ] **Step 4: 达标则把 `realtimeMode` 默认改为开（仍可在家长设置关闭），装 Release 到 iPad；未达标则列出要调的提示词/规则，不改默认。**
