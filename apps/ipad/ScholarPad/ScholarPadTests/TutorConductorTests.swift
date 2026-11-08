@@ -94,9 +94,14 @@ final class TutorConductorTests: XCTestCase {
         now = now.addingTimeInterval(1.25)
         try await eventually { session.calls.contains("header") }
         session.emitHeader("{\"transcript\":\"帮我\",\"kind\":\"help\"}")
+        var recorded: [TurnRecord] = []
+        conductor.onTurnRecorded = { recorded.append($0) }
         session.emitReply(text: RealtimeTestSupport.passingUtterance, audio: [Data([1, 0])])
         try await eventually { !audio.played.isEmpty }
         XCTAssertEqual(conductor.latencyFromChildFinishedToFirstPlay ?? -1, 1.25, accuracy: 0.01)
+        try await eventually { recorded.count == 1 }
+        XCTAssertEqual(recorded[0].latencyMs, 1250)
+        XCTAssertEqual(recorded[0].tokens, 12)
     }
 
     func testAcknowledgementRotates() async throws {

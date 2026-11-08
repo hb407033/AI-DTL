@@ -2,6 +2,8 @@
 
 分支仍是 `cursor/ipad-realtime-guided-dialogue-93b6`。没有改设备信任，没有改签名凭据，没有动家庭作品库 `workspaces-v2`，没有发放或领取密钥，没有 SSH mini，没有在 mini 上跑探针、起服务或部署。没有装 Release，也没有把 `realtimeMode` 默认改成开。
 
+后来的隔离对照见 `docs/handoffs/2026-11-08-realtime-vs-v16-comparison.md`。下面这一节只记录当时的安装。
+
 ## 认到的设备
 
 当时 Mac 上：

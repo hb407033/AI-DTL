@@ -4,7 +4,7 @@ import Foundation
 @MainActor
 enum RealtimeSpeechSynthesis {
     static func speak(_ text: String, credentialURL: URL, apiKey: String, timeout: Duration = .seconds(45),
-                      makeSession: (URL, String) -> RealtimeSession) async throws -> (pcm: Data, spoken: String) {
+                      tally: TokenTally? = nil, makeSession: (URL, String) -> RealtimeSession) async throws -> (pcm: Data, spoken: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { throw ThinkingTextError.invalidInstructions }
         guard credentialURL.scheme == "wss", credentialURL.user == nil else { throw ThinkingTextError.insecureEndpoint }
@@ -13,7 +13,10 @@ enum RealtimeSpeechSynthesis {
         let box = SpeechCollect()
         session.onAudioDelta = { if box.open { box.pcm.append($0) } }
         session.onSpokenDelta = { if box.open { box.spoken += $0 } }
-        session.onResponseDone = { _ in box.finish() }
+        session.onResponseDone = { usage in
+            tally?.slowSpeech += usage.totalTokens
+            box.finish()
+        }
         defer {
             box.open = false
             session.onAudioDelta = nil

@@ -63,8 +63,9 @@ final class SlowPathCompositionTests: XCTestCase {
         XCTAssertEqual(body["max_tokens"] as? Int, 4096)
         XCTAssertEqual(body["modalities"] as? [String], ["text"])
         XCTAssertEqual(body["stream"] as? Bool, true)
-        XCTAssertEqual(text, "{\"ok\":true}")
-        XCTAssertFalse(text.contains("思维链"))
+        XCTAssertEqual(text.text, "{\"ok\":true}")
+        XCTAssertEqual(text.tokens, 0)
+        XCTAssertFalse(text.text.contains("思维链"))
     }
 
     func testInsecureRealtimeURLDoesNotSendTheKey() async throws {
@@ -224,6 +225,17 @@ final class SlowPathCompositionTests: XCTestCase {
         try transport.emit(["type": "response.audio_transcript.delta", "response_id": "speak", "delta": spoken])
         try transport.emit(["type": "response.audio.delta", "response_id": "speak", "delta": pcm.base64EncodedString()])
         try transport.emit(["type": "response.done", "response": ["id": "speak"]])
+    }
+
+    func testParseSSECountsUsageOnce() throws {
+        let tally = TokenTally()
+        let event = #"{"choices":[{"delta":{"content":"好"},"finish_reason":"stop"}],"usage":{"total_tokens":17}}"#
+        let body = "data: \(event)\n\ndata: [DONE]\n\n"
+        let parsed = try ThinkingTextClient.parseSSE(Data(body.utf8))
+        XCTAssertEqual(parsed.text, "好")
+        XCTAssertEqual(parsed.tokens, 17)
+        tally.slowText += parsed.tokens
+        XCTAssertEqual(tally.total, 17)
     }
 }
 

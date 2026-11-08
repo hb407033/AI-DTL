@@ -159,15 +159,18 @@ final class WorkspaceClient: ObservableObject {
     /// 应用实际使用的慢路径。文字请求走思考模型的 HTTPS，朗读用一条临时实时连接。测试只替换传输。
     static func makeRealtimeSlowPath(gates: TeachingGates, credentialURL: URL, apiKey: String,
                                      textTimeout: Duration = .seconds(45), speechTimeout: Duration = .seconds(45),
+                                     tally: TokenTally? = nil,
                                      textTransport: @escaping @MainActor (URLRequest) async throws -> (Data, HTTPURLResponse),
                                      makeSpeechSession: @escaping @MainActor (URL, String) -> RealtimeSession) -> SlowPath {
         let lifetime = SlowPathLifetime()
         let slow = SlowPath(gates: gates, requestText: { instructions, image in
-            try await ThinkingTextClient.request(instructions: instructions, image: image, credentialURL: credentialURL,
-                                                 apiKey: apiKey, timeout: textTimeout, transport: textTransport)
+            let answered = try await ThinkingTextClient.request(instructions: instructions, image: image, credentialURL: credentialURL,
+                                                                 apiKey: apiKey, timeout: textTimeout, transport: textTransport)
+            if answered.tokens > 0 { tally?.slowText += answered.tokens }
+            return answered.text
         }, speak: { text in
             try await RealtimeSpeechSynthesis.speak(text, credentialURL: credentialURL, apiKey: apiKey,
-                                                    timeout: speechTimeout, makeSession: makeSpeechSession)
+                                                    timeout: speechTimeout, tally: tally, makeSession: makeSpeechSession)
         }, lifetime: lifetime)
         lifetime.addCancel { gates.cancelSlow() }
         return slow
@@ -183,13 +186,18 @@ final class WorkspaceClient: ObservableObject {
         #else
         endpoint = realtimeRequested() ? RealtimeKeyStore.load() : nil
         #endif
-        guard let endpoint else { return false }
+        guard let endpoint else {
+            if realtimeRequested() { NSLog("AIDTL-REALTIME unavailable") }
+            return false
+        }
+        NSLog("AIDTL-REALTIME armed")
         let gates: TeachingGates
         do { gates = try TeachingGates() }
-        catch { status = "实时对话没准备好，仍用原来的主机对话。"; return false }
+        catch { status = "实时对话没准备好，仍用原来的主机对话。"; NSLog("AIDTL-REALTIME gates-failed"); return false }
         let session = RealtimeSession(url: endpoint.url, apiKey: endpoint.apiKey)
         let audioPlayer = audio
-        let slow = Self.makeRealtimeSlowPath(gates: gates, credentialURL: endpoint.url, apiKey: endpoint.apiKey, textTransport: { request in
+        let tally = TokenTally()
+        let slow = Self.makeRealtimeSlowPath(gates: gates, credentialURL: endpoint.url, apiKey: endpoint.apiKey, tally: tally, textTransport: { request in
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse else { throw ThinkingTextError.invalidResponse }
             return (data, http)
@@ -198,7 +206,7 @@ final class WorkspaceClient: ObservableObject {
         let conductor = TutorConductor(session: session, gates: gates, audio: audioPlayer, slowPath: slow, context: { [weak self] in
             self?.gateContext() ?? GateContext(record: WorkspaceClient.placeholderRecord, turnId: "t", responseId: "r",
                                                permission: "hint", child: "", history: [], imageAttached: false, ocrNumbers: [])
-        })
+        }, tokens: tally)
         conductor.onPhase = { [weak self] phase, text, messages in
             guard let self, self.realtimeActive else { return }
             self.connected = phase != .off
@@ -265,7 +273,24 @@ final class WorkspaceClient: ObservableObject {
                                  record: saved, decisions: [],
                                  turns: [SyncTurn(turnId: turn.turnId, transcript: transcript, kind: turn.kind, utterance: turn.utterance,
                                                   played: turn.played, path: turn.path, gateReason: turn.gateReason, latencyMs: turn.latencyMs)],
-                                 usage: []))
+                                 usage: usageEntries(for: turn, sessionId: saved.sessionId)))
+    }
+
+    /// 只同步 token 计数。不放录音、密钥或思维链。
+    private func usageEntries(for turn: TurnRecord, sessionId: String) -> [SyncUsage] {
+        guard let tally = conductor?.tokens, tally.total > 0 else { return [] }
+        let path = ["fast", "slow", "none"].contains(turn.path) ? turn.path : nil
+        var rows: [SyncUsage] = []
+        func add(_ name: String, _ model: String, _ purpose: String, _ count: Int) {
+            guard count > 0 else { return }
+            rows.append(SyncUsage(sessionId: sessionId, turnId: turn.turnId, callId: "\(name)-\(turn.turnId)".prefix(80).description,
+                                  responseId: turn.responseId, purpose: purpose, model: model, status: "completed",
+                                  usage: ["total_tokens": count], estimatedCostCny: nil, latencyMs: turn.latencyMs, path: path))
+        }
+        add("session", "qwen3.8-omni-flash-realtime", "teaching", tally.session)
+        add("slow-text", ThinkingTextClient.model, "decision", tally.slowText)
+        add("slow-speech", "qwen3.8-omni-flash-realtime", "teaching", tally.slowSpeech)
+        return rows
     }
 
     private func outboxDirectory() -> URL {

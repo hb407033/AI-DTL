@@ -19,7 +19,7 @@ enum ThinkingTextClient {
 
     static func request(instructions: String, image: Data?, credentialURL: URL, apiKey: String,
                         timeout: Duration = .seconds(45),
-                        transport: @escaping @MainActor (URLRequest) async throws -> (Data, HTTPURLResponse)) async throws -> String {
+                        transport: @escaping @MainActor (URLRequest) async throws -> (Data, HTTPURLResponse)) async throws -> (text: String, tokens: Int) {
         if instructions.isEmpty || instructions.count > textLimit { throw ThinkingTextError.invalidInstructions }
         if let image, image.isEmpty || image.count > 180_000 { throw ThinkingTextError.imageSize }
         guard let url = completionsURL(credentialURL) else { throw ThinkingTextError.insecureEndpoint }
@@ -83,11 +83,12 @@ enum ThinkingTextClient {
     }
 
     /// 只保留正文。思维链内容不进入结果。
-    static func parseSSE(_ data: Data) throws -> String {
+    static func parseSSE(_ data: Data) throws -> (text: String, tokens: Int) {
         var pending = String(decoding: data, as: UTF8.self)
         var text = ""
         var done = false
         var finish: String?
+        var reportedTokens: Int?
         while let range = pending.range(of: "\r\n\r\n") ?? pending.range(of: "\n\n") {
             let frame = String(pending[..<range.lowerBound])
             pending = String(pending[range.upperBound...])
@@ -101,6 +102,7 @@ enum ThinkingTextClient {
             guard let encoded = payload.data(using: .utf8),
                   let event = try JSONSerialization.jsonObject(with: encoded) as? [String: Any] else { throw ThinkingTextError.incomplete }
             if event["error"] != nil { throw ThinkingTextError.provider }
+            if let usage = event["usage"] as? [String: Any] { reportedTokens = tokenCount(usage) }
             for choice in event["choices"] as? [[String: Any]] ?? [] {
                 if let delta = choice["delta"] as? [String: Any], let content = delta["content"] as? String { text += content }
                 if let reason = choice["finish_reason"] as? String { finish = reason }
@@ -110,7 +112,15 @@ enum ThinkingTextClient {
         if !done || !pending.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || finish != "stop" {
             throw ThinkingTextError.incomplete
         }
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (text.trimmingCharacters(in: .whitespacesAndNewlines), reportedTokens ?? 0)
+    }
+
+    private static func tokenCount(_ usage: [String: Any]) -> Int? {
+        if let total = usage["total_tokens"] as? Int { return total }
+        if let prompt = usage["prompt_tokens"] as? Int, let completion = usage["completion_tokens"] as? Int {
+            return prompt + completion
+        }
+        return nil
     }
 
     private static func seconds(_ timeout: Duration) -> TimeInterval {

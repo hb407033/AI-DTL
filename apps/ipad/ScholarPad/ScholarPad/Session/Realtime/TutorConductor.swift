@@ -10,6 +10,16 @@ struct TurnRecord: Equatable {
     var kind: String?
     var gateReason: String?
     var latencyMs: Int?
+    var tokens: Int?
+}
+
+/// 一轮里各次模型调用的 token 合计。只记数字，不记正文和密钥。
+final class TokenTally {
+    var session = 0
+    var slowText = 0
+    var slowSpeech = 0
+    var total: Int { session + slowText + slowSpeech }
+    func reset() { session = 0; slowText = 0; slowSpeech = 0 }
 }
 
 @MainActor
@@ -54,20 +64,25 @@ final class TutorConductor: ObservableObject {
     private var responseId = UUID().uuidString
     private var interruptedNote = false
     private var failureSpoken = false
+    let tokens: TokenTally
     private enum Stage { case idle, capturing, awaitingHeader, awaitingReply }
 
     init(session: any RealtimeSessionProtocol, gates: TeachingGates, audio: any TutorAudioPlaying, slowPath: SlowPath? = nil,
-         context: @escaping () -> GateContext, clock: @escaping () -> Date = Date.init) {
+         context: @escaping () -> GateContext, clock: @escaping () -> Date = Date.init, tokens: TokenTally = TokenTally()) {
         self.session = session
         self.gates = gates
         self.audio = audio
         self.slowPath = slowPath
         self.context = context
         self.clock = clock
+        self.tokens = tokens
         session.onTextDelta = { [weak self] delta in self?.takeText(delta) }
         session.onSpokenDelta = { [weak self] delta in self?.spokenText += delta }
         session.onAudioDelta = { [weak self] data in self?.takeAudio(data) }
-        session.onResponseDone = { [weak self] _ in self?.responseFinished() }
+        session.onResponseDone = { [weak self] usage in
+            self?.tokens.session += usage.totalTokens
+            self?.responseFinished()
+        }
         session.onClosed = { [weak self] _ in self?.connectionClosed() }
     }
 
@@ -76,6 +91,7 @@ final class TutorConductor: ObservableObject {
         session.beginTurn()
         turnId = UUID().uuidString
         responseId = UUID().uuidString
+        tokens.reset()
         stage = .capturing
         failureSpoken = false
         setPhase(.listening, status: "正在听你说")
@@ -197,10 +213,10 @@ final class TutorConductor: ObservableObject {
         let speechMatches = spokenText.isEmpty || gates.matchesSpeech(spokenText, utterance)
         if verdict.ok && speechMatches {
             messages.append(.init(id: responseId, role: "teacher", text: utterance))
-            record(path: "fast", played: true, utterance: utterance, kind: header?.kind.rawValue, reason: nil, interrupted: false)
             setPhase(.speaking, status: audio.outputMuted ? WorkspaceClient.mutedNotice : "老师说完后，再由你来想。")
             await Task.yield()
             playBuffered(utterance)
+            record(path: "fast", played: true, utterance: utterance, kind: header?.kind.rawValue, reason: nil, interrupted: false)
             return
         }
         bufferedAudio = []
@@ -279,9 +295,14 @@ final class TutorConductor: ObservableObject {
 
     private func record(path: String, played: Bool, utterance: String, kind: String?, reason: String?, interrupted: Bool) {
         var latency: Int?
-        if let childFinishedAt { latency = Int((clock().timeIntervalSince(childFinishedAt) * 1000).rounded()) }
+        if let latencyFromChildFinishedToFirstPlay {
+            latency = Int((latencyFromChildFinishedToFirstPlay * 1000).rounded())
+        } else if let childFinishedAt {
+            latency = Int((clock().timeIntervalSince(childFinishedAt) * 1000).rounded())
+        }
         onTurnRecorded?(TurnRecord(turnId: turnId, responseId: responseId, path: path, played: played, interrupted: interrupted,
-                                   utterance: utterance, kind: kind, gateReason: reason, latencyMs: latency))
+                                   utterance: utterance, kind: kind, gateReason: reason, latencyMs: latency,
+                                   tokens: tokens.total > 0 ? tokens.total : nil))
     }
 
     private func setPhase(_ phase: VoiceStateBar.Phase, status: String) {
