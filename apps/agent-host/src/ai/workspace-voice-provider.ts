@@ -31,20 +31,26 @@ export class WorkspaceVoiceProvider {
     transcripts: Map<string, string>; text: string; audio: ((pcm: Buffer) => void) | undefined;
     callId: string; context: { sessionId: string; turnId: string } | undefined; usageEmitted: boolean } | undefined;
   private reportedUsage = new Set<string>();
-  constructor(private config: QwenConfig, private options: { frameDelayMs?: number; onUsage?: VoiceUsageCallback } = {}) {}
+  /** 最近一次连接层错误的系统码（如 ENOTFOUND、ECONNRESET、http 503），只用于排查，不含供应商错误正文。 */
+  private networkError: string | undefined;
+  constructor(private config: QwenConfig, private options: { frameDelayMs?: number; onUsage?: VoiceUsageCallback; transcribeRetryDelaysMs?: number[] } = {}) {}
 
   close() {
     this.failure = "closed";
     this.socket?.terminate(); this.socket = undefined; this.created = false;
   }
   async transcribe(pcm: Buffer, signal?: AbortSignal, context?: VoiceCallContext): Promise<string> {
-    try { return await this.run(pcm, undefined, undefined, undefined, signal, context); }
-    catch (error) {
-      // 仅没有对孩子输出、没有写入教学事实的内部转写可以有一次有界重试。
-      // 教学只允许在尚未发送音频的握手阶段恢复，不重放已发送的输入。
-      if (signal?.aborted || !(error instanceof Error)
-        || !["providerTimeout", "connectionFailed", "connectionClosed"].includes(error.message)) throw error;
-      return this.run(pcm, undefined, undefined, undefined, signal, context);
+    // 仅没有对孩子输出、没有写入教学事实的内部转写可以有界重试；教学只允许在尚未发送音频的握手阶段恢复。
+    // 家里网络偶尔断几秒（2026-11-08 真机：同一句两次立即重试都失败，老师没了声音），所以间隔着多试两次。
+    const delays = this.options.transcribeRetryDelaysMs ?? [400, 1200];
+    for (let attempt = 0; ; attempt++) {
+      try { return await this.run(pcm, undefined, undefined, undefined, signal, context); }
+      catch (error) {
+        if (attempt >= delays.length || signal?.aborted || !(error instanceof Error)
+          || !["providerTimeout", "connectionFailed", "connectionClosed"].includes(error.message)) throw error;
+        await new Promise(r => setTimeout(r, delays[attempt]));
+        if (signal?.aborted) throw Error("aborted");
+      }
     }
   }
   respond(pcm: Buffer, instructions: string, image: Buffer | undefined,
@@ -68,12 +74,20 @@ export class WorkspaceVoiceProvider {
   }
   private connect() {
     if (this.socket) return;
-    this.failure = undefined; this.created = false;
+    this.failure = undefined; this.created = false; this.networkError = undefined;
     const socket = new WebSocket(this.config.url, { headers: { Authorization: `Bearer ${this.config.apiKey}` },
       maxPayload: 512 * 1024, handshakeTimeout: 10000 });
     this.socket = socket;
-    socket.on("error", () => { if (this.socket === socket) this.failure = "connectionFailed"; });
-    socket.on("close", () => { if (this.socket === socket) this.failure = "connectionClosed"; });
+    socket.on("unexpected-response", (_request, response) => {
+      if (this.socket !== socket) return;
+      this.networkError = `http ${response.statusCode}`; this.failure = "connectionFailed"; socket.terminate();
+    });
+    socket.on("error", error => {
+      if (this.socket !== socket) return;
+      this.networkError = (error as NodeJS.ErrnoException).code ?? "socketError"; this.failure = "connectionFailed";
+    });
+    // 断网/DNS 失败也会紧跟一个 close；不能把已记下的连接失败覆盖成“云端关闭”。
+    socket.on("close", () => { if (this.socket === socket && !this.failure) this.failure = "connectionClosed"; });
     socket.on("message", raw => {
       if (this.socket !== socket) return;
       try {
@@ -187,8 +201,8 @@ export class WorkspaceVoiceProvider {
     } catch (error) {
       // 失败/取消必须如实记录；不记录语音、题目、URL、凭据或供应商错误正文。
       this.emitUsage(a.teaching ? "teaching" : "transcription", signal?.aborted ? "cancelled" : "failed", null);
-      console.warn("workspaceProviderFailure", { stage: a.teaching ? "teaching" : "transcription",
-        code: error instanceof Error ? error.message : "unknown", events: this.recentEvents,
+      console.warn("workspaceProviderFailure", { at: new Date().toISOString(), stage: a.teaching ? "teaching" : "transcription",
+        code: error instanceof Error ? error.message : "unknown", network: this.networkError, events: this.recentEvents,
         committed: !!a.item, responseDone: a.done, matchingTranscript: !!(a.item && a.transcripts.has(a.item)) });
       this.close(); throw error;
     }

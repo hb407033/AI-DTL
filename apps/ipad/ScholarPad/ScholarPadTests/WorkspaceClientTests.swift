@@ -32,6 +32,125 @@ private final class WorkspaceTestTransport: WorkspaceTransport {
 
 @MainActor
 final class WorkspaceClientTests: XCTestCase {
+    func testWaitAMomentKeepsConversationButExplicitPauseStillStops() async throws {
+        let record = try fixture(), transport = WorkspaceTestTransport()
+        let client = WorkspaceClient(transportFactory: { _ in transport }); client.record = { record }
+        defer { client.pause() }
+        let turn = try await pendingReply(client, transport: transport)
+        client.receive(["type": "paused", "turnId": turn, "resumable": true])
+        XCTAssertTrue(client.connected); XCTAssertFalse(client.working)
+        XCTAssertTrue(client.status.contains("我还在"))
+        client.submitPCM(Data(repeating: 0, count: 3200))
+        try await eventually { transport.sent.filter { $0["type"] as? String == "voiceEnd" }.count == 2 }
+        client.receive(["type": "paused"])
+        XCTAssertFalse(client.connected); XCTAssertTrue(transport.closed)
+    }
+    func testInterruptBeforeOpeningSnapshotCompletesDoesNotSendStaleStart() async throws {
+        let record = try fixture(), transport = WorkspaceTestTransport()
+        let client = WorkspaceClient(transportFactory: { _ in transport }); client.record = { record }
+        var release: CheckedContinuation<Void, Never>?
+        client.evidence = { _ in
+            await withCheckedContinuation { release = $0 }
+            return WorkspaceEvidence(submissionId: "s", problemId: record.problem!.problemId,
+                problemRevision: record.problem!.statement.revision, boardRevision: 0, previewId: "preview", explanation: "")
+        }
+        client.connect(host: "127.0.0.1", microphone: false, conversationMode: "dialogue", leadDiscussion: true)
+        defer { release?.resume(); release = nil; client.pause() }
+        try transport.emit(["type": "ready", "discussionOpeningSupported": true])
+        try await eventually { release != nil }
+        client.interruptReply()
+        release?.resume(); release = nil
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertTrue(client.connected); XCTAssertFalse(client.working)
+        XCTAssertFalse(transport.sent.contains { ["interrupt", "startDiscussion"].contains($0["type"] as? String ?? "") })
+    }
+    func testCancelledEvidenceCannotSendLateAuthorization() async throws {
+        let record = try fixture(), transport = WorkspaceTestTransport()
+        let client = WorkspaceClient(transportFactory: { _ in transport }); client.record = { record }
+        defer { client.pause() }
+        client.connect(host: "127.0.0.1", microphone: false, conversationMode: "dialogue")
+        try transport.emit(["type": "ready"]); try await eventually { client.connected }
+        client.submitPCM(Data(repeating: 0, count: 3200))
+        try await eventually { transport.sent.contains { $0["type"] as? String == "voiceEnd" } }
+        let turn = try XCTUnwrap(transport.sent.last?["turnId"] as? String)
+        var release: CheckedContinuation<Void, Never>?
+        client.evidence = { _ in
+            await withCheckedContinuation { release = $0 }
+            return WorkspaceEvidence(submissionId: "s", problemId: record.problem!.problemId,
+                problemRevision: record.problem!.statement.revision, boardRevision: 0, previewId: "preview", explanation: "")
+        }
+        client.receive(["type": "transcript", "turnId": turn, "text": "帮我一下", "action": "help"])
+        try await eventually { release != nil }
+        client.interruptReply()
+        client.receive(["type": "interrupted", "turnId": turn])
+        release?.resume(); release = nil
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertFalse(transport.sent.contains { $0["type"] as? String == "authorize" })
+        XCTAssertTrue(client.connected); XCTAssertFalse(client.working)
+    }
+    func testTwentyTurnsRecoverFromTranscriptionFailureWithoutReplayingOrReconnecting() async throws {
+        let record = try fixture(), transport = WorkspaceTestTransport()
+        let client = WorkspaceClient(transportFactory: { _ in transport }); client.record = { record }
+        var prompts: [String] = []
+        client.speakPrompt = { prompts.append($0) }
+        client.connect(host: "127.0.0.1", microphone: false, conversationMode: "dialogue")
+        defer { client.pause() }
+        try transport.emit(["type": "ready"]); try await eventually { client.connected }
+        for index in 0..<20 {
+            client.submitPCM(Data(repeating: 0, count: 3200))
+            try await eventually { transport.sent.filter { $0["type"] as? String == "voiceEnd" }.count == index + 1 }
+            let turn = try XCTUnwrap(transport.sent.last?["turnId"] as? String)
+            if [2, 7, 12, 18].contains(index) {
+                let before = prompts.count
+                client.receive(["type": "error", "code": "connectionClosed", "recoverable": true, "stage": "transcription", "turnId": turn])
+                XCTAssertTrue(client.status.contains("没听清"))
+                // 2026-11-08 真机：只显示文字孩子注意不到，要在本机说出来。
+                try await eventually { prompts.count == before + 1 }
+                XCTAssertEqual(prompts.last, "刚才没听清，你再说一遍好吗？")
+                client.receive(["type": "transcript", "turnId": turn, "text": "迟到原话", "action": "uncertain"])
+                XCTAssertFalse(client.messages.contains { $0.text == "迟到原话" })
+            } else { client.receive(["type": "transcript", "turnId": turn, "text": "我继续自己试", "action": "uncertain"]) }
+            XCTAssertTrue(client.connected); XCTAssertFalse(client.working)
+        }
+        XCTAssertEqual(transport.frames, 20)
+        XCTAssertEqual(transport.sent.filter { $0["type"] as? String == "hello" }.count, 1)
+        XCTAssertEqual(prompts.count, 4)
+    }
+    func testInterruptBuffersNewSpeechWhileSettlementExceedsThreeSeconds() async throws {
+        let record = try fixture(), transport = WorkspaceTestTransport()
+        let client = WorkspaceClient(transportFactory: { _ in transport }); client.record = { record }
+        defer { client.pause() }
+        let turn = try await pendingReply(client, transport: transport)
+        client.interruptReply()
+        try await eventually { transport.sent.contains { $0["type"] as? String == "interrupt" } }
+        client.receive(["type": "interruptAccepted", "turnId": turn])
+        client.submitPCM(Data(repeating: 1, count: 6400))
+        try await Task.sleep(for: .milliseconds(3200))
+        XCTAssertTrue(client.connected, "取消已接收，不因旧写入暂未排空而退出整个对话")
+        XCTAssertEqual(transport.frames, 1, "回执前只在本机保留这一次新插话")
+        client.receive(["type": "interrupted", "turnId": turn])
+        try await eventually { transport.sent.filter { $0["type"] as? String == "voiceEnd" }.count == 2 }
+        XCTAssertEqual(transport.frames, 3)
+        XCTAssertNotEqual(transport.sent.last?["turnId"] as? String, turn)
+        XCTAssertEqual(transport.sent.filter { $0["type"] as? String == "hello" }.count, 1)
+    }
+    func testUnexpectedSocketDropReconnectsWithoutReplayingSpeechOrOpeningDiscussion() async throws {
+        let record = try fixture(), first = WorkspaceTestTransport(), second = WorkspaceTestTransport()
+        var transports = [first, second]
+        second.onSend = { event in if event["type"] as? String == "hello" { try second.emit(["type": "ready"]) } }
+        let client = WorkspaceClient(transportFactory: { _ in transports.removeFirst() }); client.record = { record }
+        client.connect(host: "127.0.0.1", microphone: false, conversationMode: "dialogue")
+        defer { client.pause() }
+        try first.emit(["type": "ready"]); try await eventually { client.connected }
+        first.close()
+        try await eventually { second.sent.contains { $0["type"] as? String == "hello" } }
+        try await eventually { client.connected }
+        XCTAssertFalse(second.sent.contains { ["voiceStart", "startDiscussion", "authorize"].contains($0["type"] as? String ?? "") })
+        XCTAssertEqual(second.sent.first?["conversationMode"] as? String, "dialogue")
+        XCTAssertEqual(second.frames, 0)
+        client.submitPCM(Data(repeating: 0, count: 3200))
+        try await eventually { second.frames == 1 }
+    }
     func testRecoverableReplyFailureKeepsConversationAndLatestExpressionForNextTurn() async throws {
         var record = try fixture()
         let original = record, transport = WorkspaceTestTransport()
@@ -456,18 +575,52 @@ final class WorkspaceClientTests: XCTestCase {
         XCTAssertTrue(client.status.contains("异议"))
     }
     func testFrameSendFailureDoesNotSendVoiceEndOrClaimSuccessfulSubmission() async throws {
-        let record = try fixture(), transport = WorkspaceTestTransport()
+        let record = try fixture(), transport = WorkspaceTestTransport(), second = WorkspaceTestTransport()
+        var transports = [transport, second]
         transport.failFrame = 2
         transport.onSend = { event in if event["type"] as? String == "hello" { try transport.emit(["type": "ready", "record": self.object(record)]) } }
-        let client = WorkspaceClient(transportFactory: { _ in transport })
+        second.onSend = { event in if event["type"] as? String == "hello" { try second.emit(["type": "ready", "record": self.object(record)]) } }
+        let client = WorkspaceClient(transportFactory: { _ in transports.removeFirst() })
         client.record = { record }
+        defer { client.pause() }
         client.connect(host: "127.0.0.1", microphone: false)
         try await eventually { client.connected }
         client.submitPCM(Data(repeating: 0, count: 9600))
         try await eventually { transport.closed }
         XCTAssertFalse(client.working); XCTAssertFalse(client.listening)
         XCTAssertFalse(transport.sent.contains { $0["type"] as? String == "voiceEnd" })
-        XCTAssertTrue(client.status.contains("没连上老师"), client.status)
+        XCTAssertTrue(client.status.contains("恢复中"), client.status)
+        try await eventually { !second.sent.isEmpty && client.connected }
+        XCTAssertEqual(second.sent.compactMap { $0["type"] as? String }, ["hello"])
+        XCTAssertEqual(second.frames, 0, "只恢复连接，不重发半句旧录音")
+        client.submitPCM(Data(repeating: 0, count: 3200))
+        try await eventually { second.sent.contains { $0["type"] as? String == "voiceEnd" } }
+        XCTAssertEqual(second.frames, 1)
+    }
+    func testPauseCancelsPendingReconnect() async throws {
+        let record = try fixture(), transport = WorkspaceTestTransport()
+        var allocations = 0
+        let client = WorkspaceClient(transportFactory: { _ in allocations += 1; return transport })
+        client.record = { record }; client.connect(host: "127.0.0.1", microphone: false)
+        try transport.emit(["type": "ready"]); try await eventually { client.connected }
+        transport.close(); try await eventually { !client.connected }
+        client.pause()
+        try await Task.sleep(for: .milliseconds(500))
+        XCTAssertEqual(allocations, 1); XCTAssertFalse(client.connected); XCTAssertFalse(client.listening)
+    }
+    func testRepeatedSocketFailureHasOnlyTwoReconnectAttempts() async throws {
+        let record = try fixture()
+        var allocations = 0
+        let client = WorkspaceClient(transportFactory: { _ in
+            allocations += 1
+            let transport = WorkspaceTestTransport()
+            transport.onSend = { _ in throw URLError(.cannotConnectToHost) }
+            return transport
+        })
+        client.record = { record }; client.connect(host: "127.0.0.1", microphone: false)
+        defer { client.pause() }
+        try await Task.sleep(for: .milliseconds(1700))
+        XCTAssertEqual(allocations, 3); XCTAssertFalse(client.connected); XCTAssertEqual(client.recovery, .retry)
     }
     func testExitSavesBeforeClosingTransportAndDoesNotRestartMicrophone() async throws {
         let record = try fixture(), transport = WorkspaceTestTransport()

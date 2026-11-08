@@ -5,6 +5,20 @@ import AVFoundation
 
 final class TutorAudioTests: XCTestCase {
     @MainActor
+    func testWorkspaceMicrophoneRemainsOpenDuringPlaybackAndInterrupt() async throws {
+        let audio = TutorAudioIO(); defer { audio.stop() }
+        await audio.listen()
+        XCTAssertTrue(audio.recording)
+        audio.beginResponse()
+        XCTAssertTrue(audio.recording, "老师开口时仍需接住孩子的插话")
+        try audio.play(Data(repeating: 0, count: 9600))
+        audio.stopPlayback()
+        XCTAssertTrue(audio.recording, "停声不停止麦克风")
+        audio.completeResponse()
+        audio.stop()
+        XCTAssertFalse(audio.recording)
+    }
+    @MainActor
     func testGeneratedOmniRepliesPlayOnDeviceAcrossThreeTurns() async throws {
         guard let base = ProcessInfo.processInfo.environment["AI_DTL_TEST_AUDIO_URL"] else {
             throw XCTSkip("需要合成语音真实模型返回的 PCM 临时服务地址")

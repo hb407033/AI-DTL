@@ -20,7 +20,9 @@ export interface WorkspaceVoice {
 export function registerWorkspaceVoice(app: FastifyInstance, store: WorkspaceStore, acquire: () => WorkspaceVoice,
   afterHelp?: (record: WorkspaceRecord, submissionId: string, responseId: string, signal: AbortSignal) => Promise<unknown>,
   decisions?: TeachingDecisionProvider, thinkingMode?: boolean) {
-  app.get("/tutor/workspace", { websocket: true }, child => {
+  app.get("/tutor/workspace", { websocket: true }, (child, request) => {
+    // 新旧平板可独立升级：旧客户端无法处理没有 responseId 的转写恢复回执。
+    const listeningRecovery = new URL(request.url, "http://localhost").searchParams.get("voiceRecovery") === "1";
     let sessionId: string | undefined, provider: WorkspaceVoice | undefined;
     const expressions = new ChildExpressionContext();
     const followup = new OneAnswerFollowup();
@@ -31,13 +33,15 @@ export function registerWorkspaceVoice(app: FastifyInstance, store: WorkspaceSto
     let conversationProblemId: string | undefined, conversationRevision: number | undefined;
     let activeThinking: { turnId: string; responseId: string; epoch: number } | undefined;
     let pendingResponse: { turnId: string; responseId: string; epoch: number } | undefined;
+    let pendingTranscription: { turnId: string; epoch: number } | undefined;
+    let queuedTurnId: string | undefined;
     const send = (event: object) => { if (!closed && child.readyState === 1) child.send(JSON.stringify({ schemaVersion: 2, sessionId, ...event })); };
     const finishThinking = (type: "thinkingEnd" | "thinkingCancel", expectedEpoch: number) => {
       if (!activeThinking || activeThinking.epoch !== expectedEpoch || expectedEpoch !== epoch) return;
       const { turnId, responseId } = activeThinking; activeThinking = undefined;
       send({ type, turnId, responseId });
     };
-    const cancel = () => { finishThinking("thinkingCancel", epoch); pendingResponse = undefined; epoch++; followup.clear(); controller.abort(); controller = new AbortController(); provider?.close(); provider = undefined; };
+    const cancel = () => { finishThinking("thinkingCancel", epoch); pendingResponse = undefined; pendingTranscription = undefined; queuedTurnId = undefined; epoch++; followup.clear(); controller.abort(); controller = new AbortController(); provider?.close(); provider = undefined; };
     const checkEpoch = (expectedEpoch: number) => { if (closed || expectedEpoch !== epoch) throw Error("aborted"); };
     const load = async (expectedEpoch = epoch) => {
       if (!sessionId) throw Error("helloRequired");
@@ -125,16 +129,19 @@ export function registerWorkspaceVoice(app: FastifyInstance, store: WorkspaceSto
         try { command = workspaceCommandSchema.parse(JSON.parse(data.toString())); }
         catch { send({ type: "error", code: "invalidCommand" }); return; }
         if (command.type === "interrupt") {
-          if (command.sessionId !== sessionId || command.turnId !== turn?.id) { send({ type: "error", code: "staleTurn" }); return; }
+          if (command.sessionId !== sessionId || command.turnId !== (queuedTurnId ?? turn?.id)) { send({ type: "error", code: "staleTurn" }); return; }
           cancel();
           const interruptedTurn = command.turnId;
           const interruptedEpoch = epoch;
+          // 接收取消与持久化收尾是两个屏障；客户端可先接住插话，但仍等 interrupted 才提交下一轮。
+          send({ type: "interruptAccepted", turnId: interruptedTurn });
           // 停声/取消立即发生；回执等旧写入退出后携带权威版本，作为退出保存的屏障。
           queue = queue.then(async () => send({ type: "interrupted", turnId: interruptedTurn, record: await load(interruptedEpoch) }))
             .catch(() => { if (!closed && interruptedEpoch === epoch) send({ type: "error", code: "interruptFailed" }); });
           return;
         }
         if (command.type === "authorize" && command.action === "correct" && command.sessionId === sessionId) cancel();
+        if ((command.type === "voiceStart" || command.type === "startDiscussion") && command.sessionId === sessionId) queuedTurnId = command.turnId;
       }
       const capturedEpoch = epoch;
       queue = queue.then(async () => {
@@ -170,6 +177,7 @@ export function registerWorkspaceVoice(app: FastifyInstance, store: WorkspaceSto
           if (!media || media.data.length > 180000) throw Error("missingEvidence");
           discussionStarted = true;
           turn = { id: c.turnId, problemId: record.problem.problemId, chunks: [], bytes: 0, ended: true, transcript: "", continuation: false };
+          if (queuedTurnId === c.turnId) queuedTurnId = undefined;
           record.feedback.push({ responseId: c.eventId, turnId: c.turnId, summary: "", contested: true });
           record = await save(record, randomUUID());
           send({ type: "record", record });
@@ -206,14 +214,18 @@ export function registerWorkspaceVoice(app: FastifyInstance, store: WorkspaceSto
         }
         if (c.type === "voiceStart") {
           if (!record.problem?.statement.confirmed || c.problemId !== record.problem.problemId || c.expectedRevision !== record.revision) throw Error("revisionConflict");
-          turn = { id: c.turnId, problemId: c.problemId, chunks: [], bytes: 0, ended: false, transcript: "", continuation: false }; return;
+          turn = { id: c.turnId, problemId: c.problemId, chunks: [], bytes: 0, ended: false, transcript: "", continuation: false };
+          if (queuedTurnId === c.turnId) queuedTurnId = undefined;
+          return;
         }
         if (c.type === "voiceEnd") {
           if (!turn || turn.id !== c.turnId || turn.problemId !== c.problemId || turn.ended || !turn.bytes) throw Error("staleTurn");
           turn.ended = true; provider ??= acquire();
           const current = turn;
+          pendingTranscription = { turnId: current.id, epoch: capturedEpoch };
           const transcript = await provider.transcribe(Buffer.concat(current.chunks), controller.signal, { sessionId: sessionId!, turnId: current.id });
           if (capturedEpoch !== epoch || closed) return;
+          pendingTranscription = undefined;
           current.transcript = transcript;
           // 题意版本变更后对话授权失效：回到独立模式，不自动开麦或给提示。
           if (conversationProblemId !== record.problem?.problemId || conversationRevision !== record.problem?.statement.revision) {
@@ -223,8 +235,11 @@ export function registerWorkspaceVoice(app: FastifyInstance, store: WorkspaceSto
           }
           const action = conversationAction(conversationMode, transcript);
           if (action === "pause") {
-            cancel(); conversationMode = "independent";
-            send({ type: "paused", turnId: current.id });
+            const phrase = transcript.replace(/[\s，。！？、,.!?]/gu, "");
+            const resumable = listeningRecovery && /^(停一下|等一下|我先想一想|我想自己想一想|我想想先别说)$/u.test(phrase);
+            cancel();
+            if (!resumable) conversationMode = "independent";
+            send({ type: "paused", turnId: current.id, ...(resumable ? { resumable: true } : {}) });
             return;
           }
           expressions.add(current.problemId, record.problem!.statement.revision, current.id, transcript);
@@ -420,10 +435,11 @@ export function registerWorkspaceVoice(app: FastifyInstance, store: WorkspaceSto
         let code = error instanceof Error && error.name === "TimeoutError" ? "providerTimeout"
           : error instanceof Error && known.includes(error.message) ? error.message : "workspaceVoiceFailed";
         const failed = pendingResponse?.epoch === capturedEpoch ? pendingResponse : undefined;
+        const failedListening = pendingTranscription?.epoch === capturedEpoch ? pendingTranscription : undefined;
         const retryable = ["decisionNeedsReview", "speechMismatch", "providerTimeout", "providerError", "connectionClosed", "connectionFailed", "workspaceVoiceFailed"].includes(code);
-        // 只恢复已授权且正在生成的单轮回复；权限、作品损坏和过期证据仍保持致命边界。
+        // 转写或已授权回复的单轮上游失败可恢复；权限、作品损坏和过期证据仍保持致命边界。
         // 不能自动重发录音，也不能把被拒绝的草稿当成有效教学历史。
-        if (failed && retryable) {
+        if ((failed || (failedListening && listeningRecovery)) && retryable) {
           // 权威回执读取期间仍保留这轮身份，使打断/退出可取得 interrupted 屏障。
           // 轮次已经 ended，不能再追加PCM；下一次 voiceStart 自然替换它。
           cancel();
@@ -431,8 +447,9 @@ export function registerWorkspaceVoice(app: FastifyInstance, store: WorkspaceSto
           try {
             const latest = await load(recoveryEpoch);
             if (latest.problem?.problemId !== conversationProblemId || latest.problem?.statement.revision !== conversationRevision) throw Error("staleEvidence");
-            send({ type: "error", code, recoverable: true, turnId: failed.turnId, responseId: failed.responseId,
-              record: latest, message: "刚才这一轮没有完成，原稿已保留。可以继续说，不必重新连接。" });
+            send({ type: "error", code, recoverable: true, turnId: (failed ?? failedListening)!.turnId,
+              ...(failed ? { responseId: failed.responseId } : { stage: "transcription" }),
+              record: latest, message: failedListening ? "刚才这句没听清，可以再说；不用重新开启对话。" : "刚才这一轮没有完成，原稿已保留。可以继续说，不必重新连接。" });
             return;
           } catch (recoveryError) {
             if (closed || recoveryEpoch !== epoch) return;

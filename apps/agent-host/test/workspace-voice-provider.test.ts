@@ -195,3 +195,38 @@ test("仅内部转写遇到连接中断可重试一次，教学生成不重放",
     expect(connections).toBe(2);
   } finally { provider.close(); for (const ws of server.clients) ws.terminate(); await new Promise<void>(r => server.close(() => r())); }
 });
+
+// 2026-11-08 真机：家里网络断几秒时同一句两次立即重试都失败，老师没了声音。
+test("转写遇到连接失败间隔着最多再试两次；三次都失败才放弃，并记下真实的网络错误", async () => {
+  const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+  await new Promise<void>(r => server.once("listening", r));
+  const address = server.address(); if (!address || typeof address === "string") throw Error();
+  let connections = 0, failFirst = 2;
+  server.on("connection", ws => {
+    connections++;
+    if (connections <= failFirst) { ws.close(); return; }
+    const send = (e: object) => ws.send(JSON.stringify(e));
+    send({ type: "session.created" });
+    ws.on("message", raw => {
+      const e = JSON.parse(raw.toString());
+      if (e.type === "session.update") send({ type: "session.updated" });
+      if (e.type === "input_audio_buffer.commit") {
+        send({ type: "input_audio_buffer.committed", item_id: "item" });
+        send({ type: "conversation.item.input_audio_transcription.completed", item_id: "item", transcript: "我再说一遍" });
+      }
+    });
+  });
+  const url = `ws://127.0.0.1:${address.port}`;
+  const provider = new WorkspaceVoiceProvider({ url, apiKey: "synthetic", decisionMode: "realtime" }, { frameDelayMs: 0, transcribeRetryDelaysMs: [10, 10] });
+  try {
+    expect(await provider.transcribe(Buffer.alloc(3200))).toBe("我再说一遍");
+    expect(connections).toBe(3);
+    provider.close(); connections = 0; failFirst = 5;
+    await expect(provider.transcribe(Buffer.alloc(3200))).rejects.toThrow("connectionClosed");
+    expect(connections).toBe(3);
+  } finally { provider.close(); for (const ws of server.clients) ws.terminate(); await new Promise<void>(r => server.close(() => r())); }
+  // 连不上（端口已关）时记为连接失败，不再被随后的 close 覆盖成“云端关闭”。
+  const offline = new WorkspaceVoiceProvider({ url, apiKey: "synthetic", decisionMode: "realtime" }, { frameDelayMs: 0, transcribeRetryDelaysMs: [] });
+  await expect(offline.transcribe(Buffer.alloc(3200))).rejects.toThrow("connectionFailed");
+  offline.close();
+});
