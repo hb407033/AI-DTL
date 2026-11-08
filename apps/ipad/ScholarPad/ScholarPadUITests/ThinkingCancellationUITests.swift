@@ -18,8 +18,8 @@ final class ThinkingCancellationUITests: XCTestCase {
         let status = app.staticTexts["workspaceVoiceStatus"]
         let failed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '没想好'"), object: status)
         XCTAssertEqual(XCTWaiter.wait(for: [failed], timeout: 20), .completed, app.debugDescription)
-        XCTAssertEqual(voice.label, "暂停对话", "单轮失败不能要求重连")
-        XCTAssertFalse(app.staticTexts["思考中…"].exists)
+        XCTAssertEqual(voice.label, "结束对话", "单轮失败不能要求重连")
+        XCTAssertFalse(app.staticTexts["老师在想"].exists)
         let session = app.staticTexts["workspaceTestSession"].label
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         screenshot.name = "reply-rejected-conversation-still-open"; screenshot.lifetime = .keepAlways; add(screenshot)
@@ -38,19 +38,19 @@ final class ThinkingCancellationUITests: XCTestCase {
         nextTurn(1); nextTurn(2)
         voice.tap()
         XCTAssertTrue(app.buttons["workspaceVoice"].waitForExistence(timeout: 5))
-        XCTAssertNotEqual(voice.label, "暂停对话")
+        XCTAssertNotEqual(voice.label, "结束对话")
         voice.tap()
-        let resumed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == '暂停对话'"), object: voice)
+        let resumed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == '结束对话'"), object: voice)
         XCTAssertEqual(XCTWaiter.wait(for: [resumed], timeout: 20), .completed)
         nextTurn(3)
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "AI_DTL_WORKSPACE_CONFIRMED_FIXTURE")
         app.launch()
         XCTAssertTrue(voice.waitForExistence(timeout: 15))
-        XCTAssertNotEqual(voice.label, "暂停对话", "重开不能自动开麦")
+        XCTAssertNotEqual(voice.label, "结束对话", "重开不能自动开麦")
         XCTAssertEqual(app.staticTexts["workspaceTestSession"].label, session)
         voice.tap()
-        let reopened = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == '暂停对话'"), object: voice)
+        let reopened = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == '结束对话'"), object: voice)
         XCTAssertEqual(XCTWaiter.wait(for: [reopened], timeout: 20), .completed)
         nextTurn(1)
         let final = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -70,7 +70,7 @@ final class ThinkingCancellationUITests: XCTestCase {
         XCTAssertTrue(button.waitForExistence(timeout: 15))
         button.tap()
         let indicator = app.otherElements["workspaceThinkingIndicator"]
-        let label = app.staticTexts["思考中…"]
+        let label = app.staticTexts["老师在想"]
         XCTAssertTrue(label.waitForExistence(timeout: 15))
         XCTAssertEqual(button.label, "先停一下")
         XCTAssertFalse(app.staticTexts["上次反馈已被你提出异议，不作为学习结论。"].exists,

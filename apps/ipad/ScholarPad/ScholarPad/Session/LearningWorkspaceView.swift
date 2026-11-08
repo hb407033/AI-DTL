@@ -494,8 +494,9 @@ struct LearningWorkspaceView: View {
 
     @ViewBuilder private func confirmedVoiceControls(wide: Bool = false, chatHeight: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(voice.status).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
-                .frame(height: 18, alignment: .leading).accessibilityIdentifier("workspaceVoiceStatus")
+            VoiceStateBar(phase: VoiceStateBar.phase(connected: voice.connected, listening: voice.listening,
+                                                     working: voice.working, thinking: voice.thinking),
+                          micLevel: voice.micLevel, detail: voice.status)
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
@@ -521,12 +522,6 @@ struct LearningWorkspaceView: View {
             }
             // 记录只在自己的窗口滚动，操作区不随对话内容伸缩。
             HStack(spacing: 8) {
-                if voice.thinking {
-                    HStack(spacing: 4) {
-                        ProgressView().controlSize(.small)
-                        Text("思考中…").font(.caption).foregroundStyle(.secondary)
-                    }.accessibilityIdentifier("workspaceThinkingIndicator")
-                }
                 voiceToggleButton; voiceCorrectButton
             }
         }
@@ -584,9 +579,10 @@ struct LearningWorkspaceView: View {
             else if voice.connected { Task { await voice.finishSession { await model.saveToHost() } } }
             else { beginDiscussion() }
         } label: {
-            conversationActionLabel(voice.connected ? ((voice.working || voice.thinking) ? "先停一下" : "暂停对话")
+            conversationActionLabel(voice.connected ? ((voice.working || voice.thinking) ? "先停一下" : "结束对话")
                 : voice.recovery == .host ? "检查主机" : voice.recovery == .retry ? "重试对话" : "一起聊聊",
-                icon: voice.recovery == .host ? "gearshape" : voice.connected ? "pause.fill" : "mic.fill", primary: true)
+                icon: voice.recovery == .host ? "gearshape" : voice.connected ? ((voice.working || voice.thinking) ? "hand.raised.fill" : "stop.fill") : "mic.fill",
+                primary: true, tint: voice.connected && !(voice.working || voice.thinking) ? .red : .accentColor)
         }.buttonStyle(.plain).disabled(model.busy).accessibilityIdentifier("workspaceVoice")
     }
     private var voiceClarifyButton: some View {
@@ -603,13 +599,13 @@ struct LearningWorkspaceView: View {
             .disabled(model.busy || model.record?.feedback.isEmpty != false).accessibilityIdentifier("workspaceCorrect")
     }
 
-    private func conversationActionLabel(_ title: String, icon: String, primary: Bool = false) -> some View {
+    private func conversationActionLabel(_ title: String, icon: String, primary: Bool = false, tint: Color = .accentColor) -> some View {
         VStack(spacing: 3) {
             Image(systemName: icon).font(.system(size: 16, weight: .medium))
             Text(title).font(.caption.weight(.medium)).lineLimit(1).minimumScaleFactor(0.85)
         }.frame(maxWidth: .infinity).frame(height: 48)
-            .foregroundStyle(primary ? Color.white : Color.accentColor)
-            .background(primary ? Color.accentColor : Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+            .foregroundStyle(primary ? Color.white : tint)
+            .background(primary ? tint : tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
             .contentShape(Rectangle())
     }
 

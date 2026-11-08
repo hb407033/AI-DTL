@@ -12,6 +12,8 @@ final class TutorAudioIO {
     var onSpeechStart: (() -> Void)?
     var onDrained: (() -> Void)?
     var onError: ((String) -> Void)?
+    /// 麦克风实时音量（0…1），只给界面画声波，不存录音。
+    var onLevel: ((Double) -> Void)?
     private var engine: AVAudioEngine?
     private var player: AVAudioPlayerNode?
     private var generation = UUID()
@@ -27,6 +29,29 @@ final class TutorAudioIO {
     private var promptID = UUID()
     // 正在播的本机提示缓冲数；大于 0 时麦克风声音不进端点检测，免得把提示当成孩子说的话。
     private var prompting = 0
+    // 诊断：本轮已排进/已播完的帧数（只在 Debug 版输出日志）。
+    private var scheduledFrames = 0
+    private var playedFrames = 0
+    private var configObserver: NSObjectProtocol?
+    private func trace(_ event: String) {
+        #if DEBUG
+        let session = AVAudioSession.sharedInstance()
+        let outputs = session.currentRoute.outputs.map { "\($0.portType.rawValue)" }.joined(separator: ",")
+        NSLog("AIDTL-AUDIO %@ engine=%@ player=%@ cat=%@ mode=%@ out=%@ vol=%.2f mixer=%.2f sched=%d played=%d rec=%@",
+              event, engine?.isRunning == true ? "run" : (engine == nil ? "nil" : "stop"), player?.isPlaying == true ? "on" : "off",
+              session.category.rawValue, session.mode.rawValue, outputs, session.outputVolume,
+              engine?.mainMixerNode.outputVolume ?? -1, scheduledFrames, playedFrames, recording ? "y" : "n")
+        #endif
+    }
+    private func observe(_ engine: AVAudioEngine) {
+        if let configObserver { NotificationCenter.default.removeObserver(configObserver) }
+        configObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.trace("configChange") }
+        }
+    }
+
+    /// 系统音量为 0（或接近 0）：声音照常播放但听不见。
+    var outputMuted: Bool { AVAudioSession.sharedInstance().outputVolume < 0.05 }
 
     func listen() async {
         if recording || starting { return }
@@ -70,7 +95,11 @@ final class TutorAudioIO {
                         let sample = Double(Int16(bitPattern: UInt16(bytes[i]) | UInt16(bytes[i + 1]) << 8)) / 32768
                         energy += sample * sample
                     }
-                    if !bytes.isEmpty { self.peakInputRMS = max(self.peakInputRMS, sqrt(energy / Double(bytes.count / 2))) }
+                    if !bytes.isEmpty {
+                        let rms = sqrt(energy / Double(bytes.count / 2))
+                        self.peakInputRMS = max(self.peakInputRMS, rms)
+                        self.onLevel?(rms)
+                    }
                     if self.prompting > 0 { return }
                     let pcm = self.detector.append(data)
                     if !self.speechStarted && self.detector.hearingSpeech {
@@ -79,7 +108,7 @@ final class TutorAudioIO {
                     if let pcm { self.speechStarted = false; self.onTurn?(pcm) }
                 }
             }
-            self.engine = engine; try engine.start(); recording = true
+            self.engine = engine; observe(engine); try engine.start(); recording = true; trace("listen")
         } catch { stop(); onError?("麦克风启动失败，原稿仍保留。"); }
     }
     func beginResponse() { stopPlayback(); accepting = true }
@@ -95,9 +124,13 @@ final class TutorAudioIO {
         let player = try ensurePlayer()
         queued += 1
         let id = playbackID
+        let frames = Int(buffer.frameLength)
+        if scheduledFrames == 0 { trace("firstAudio") }
+        scheduledFrames += frames
         player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { @Sendable [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self, self.playbackID == id else { return }
+                self.playedFrames += frames
                 self.queued = max(0, self.queued - 1); self.drain()
             }
         }
@@ -110,7 +143,7 @@ final class TutorAudioIO {
             try session.setCategory(.playback, mode: .default); try session.setActive(true)
             let engine = AVAudioEngine(), node = AVAudioPlayerNode()
             engine.attach(node); engine.connect(node, to: engine.mainMixerNode, format: format)
-            try engine.start(); self.engine = engine; player = node
+            try engine.start(); self.engine = engine; player = node; observe(engine); trace("playbackEngine")
         }
         guard let player else { throw WorkspaceError.unavailable }
         return player
@@ -162,10 +195,12 @@ final class TutorAudioIO {
     func completeResponse() { guard accepting else { return }; finished = true; drain() }
     private func drain() {
         guard accepting, finished, queued == 0 else { return }
-        accepting = false; finished = false; onDrained?()
+        trace("drained"); accepting = false; finished = false; onDrained?()
     }
     func resetInput() { detector = TutorTurnDetector(); speechStarted = false }
     func stopPlayback() {
+        if scheduledFrames > 0 { trace("stopPlayback") }
+        scheduledFrames = 0; playedFrames = 0
         playbackID = UUID(); promptID = UUID(); player?.stop()
         accepting = false; queued = 0; finished = false; prompting = 0
     }
@@ -173,6 +208,7 @@ final class TutorAudioIO {
         generation = UUID(); stopPlayback()
         if recording { engine?.inputNode.removeTap(onBus: 0) }
         engine?.stop(); engine = nil; player = nil
+        onLevel?(0)
         recording = false; starting = false; resetInput()
     }
 }

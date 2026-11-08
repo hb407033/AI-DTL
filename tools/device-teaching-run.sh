@@ -21,6 +21,12 @@ print(json.dumps({'AI_DTL_WORKSPACE_TEST_ID': str(uuid.uuid4()).upper(), 'AI_DTL
   'AI_DTL_WORKSPACE_HTTP_PORT': '8797', 'AI_DTL_WORKSPACE_AUDIO_URL': 'http://hb-mini.local:8797/harness/audio',
   'AI_DTL_ADAPTIVE_PHOTO_CASE': sys.argv[2], 'AI_DTL_AUTOSTART': '1', 'AI_DTL_AUTOSTART_CANDIDATE': sys.argv[3],
   'AI_DTL_WORKSPACE_PHOTO_URL': 'http://hb-mini.local:8797/harness/photo/' + sys.argv[2]}))" "$PHOTO" "$CASE" "$CANDIDATE")
-xcrun devicectl device process launch --device "$DEVICE" --terminate-existing --environment-variables "$ENV" com.houbin.aischolar.pad
+if [ -n "${CONSOLE_LOG:-}" ]; then
+  # 附着控制台，收集 App 的 NSLog（如 AIDTL-AUDIO 播放诊断）；进程结束时自动退出。
+  nohup xcrun devicectl device process launch --device "$DEVICE" --terminate-existing --console --environment-variables "$ENV" com.houbin.aischolar.pad > "$CONSOLE_LOG" 2>&1 &
+  sleep 5
+else
+  xcrun devicectl device process launch --device "$DEVICE" --terminate-existing --environment-variables "$ENV" com.houbin.aischolar.pad
+fi
 echo "验收目录（mini）：~/$DIR"
 echo "$DIR" > /tmp/ai-dtl-device-run-dir

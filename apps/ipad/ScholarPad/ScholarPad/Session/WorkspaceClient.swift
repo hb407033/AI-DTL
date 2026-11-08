@@ -39,11 +39,14 @@ final class WorkspaceClient: ObservableObject {
     @Published private(set) var status = "你先独立想一想。需要时可以开启对话。"
     @Published private(set) var completedTurns = 0
     @Published private(set) var thinking = false
+    /// 麦克风音量分 0…5 档，界面声波用；分档避免每帧刷新界面。
+    @Published private(set) var micLevel = 0
     var record: (() -> WorkspaceRecord?)?
     var acceptRecord: ((WorkspaceRecord) throws -> Void)?
     var evidence: ((String) async throws -> WorkspaceEvidence)?
     var acceptScaffold: ((LineScaffoldJournal) -> Void)?
     private let audio = TutorAudioIO()
+    static let mutedNotice = "iPad 音量是 0，听不到老师说话。按侧面的音量加键调大。"
     private var socket: (any WorkspaceTransport)?
     private let transportFactory: (URL) -> any WorkspaceTransport
     private var generation = UUID()
@@ -84,13 +87,21 @@ final class WorkspaceClient: ObservableObject {
             return WorkspaceSocketTransport(url: target)
         }
         audio.onTurn = { [weak self] pcm in self?.submitPCM(pcm) }
+        audio.onLevel = { [weak self] rms in
+            // 说话时 RMS 约 0.02–0.2；开方拉开低音量区分度。
+            let level = min(5, Int((sqrt(rms) * 12).rounded()))
+            if self?.micLevel != level { self?.micLevel = level }
+        }
         audio.onSpeechStart = { [weak self] in
             guard let self, self.working || self.thinking else { return }
             self.interruptReply(preservingSpeech: true)
         }
         audio.onDrained = { [weak self] in
             guard let self, self.connected else { return }
-            self.working = false; self.thinking = false; self.completedTurns += 1; self.scheduleListening()
+            self.working = false; self.thinking = false; self.completedTurns += 1
+            // iPad 音量为 0 时声音照常播完却听不见（2026-11-08 真机：outputVolume=0）；提示留在屏幕上，不被“轮到你了”盖掉。
+            if self.audio.outputMuted { self.status = Self.mutedNotice; self.scheduleListening(preservingStatus: true) }
+            else { self.scheduleListening() }
         }
         audio.onError = { [weak self] message in self?.pause(); self?.recovery = .retry; self?.status = message }
     }
@@ -412,7 +423,7 @@ final class WorkspaceClient: ObservableObject {
             thinking = false
             reconnectAttempts = 0
             self.responseId = nil
-            reply = event["text"] as? String ?? ""; status = "老师说完后，再由你来想。"; audio.completeResponse()
+            reply = event["text"] as? String ?? ""; status = audio.outputMuted ? Self.mutedNotice : "老师说完后，再由你来想。"; audio.completeResponse()
             appendMessage(id: responseId, role: "老师", text: reply)
         case "corrected":
             latestExpression = nil

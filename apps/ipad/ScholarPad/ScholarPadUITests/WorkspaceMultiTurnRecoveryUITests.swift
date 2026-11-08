@@ -55,17 +55,17 @@ final class WorkspaceMultiTurnRecoveryUITests: XCTestCase {
             XCTAssertEqual(XCTWaiter.wait(for: [done], timeout: 100), .completed,
                 "\(status.label)\n\(app.staticTexts["workspaceVoiceStatus"].label)\n\(app.debugDescription)")
             XCTAssertEqual(status.label, expected, app.staticTexts["workspaceVoiceStatus"].label)
-            XCTAssertEqual(voice.label, "暂停对话", "老师播完仍须连接，不能每轮重开")
+            XCTAssertEqual(voice.label, "结束对话", "老师播完仍须连接，不能每轮重开")
             checkWork("same-work-child-turn-\(index + 1)")
         }
 
         XCTAssertEqual(voice.label, "一起聊聊", "恢复作品不得自动开麦")
-        voice.tap(); waitForVoice("暂停对话")
+        voice.tap(); waitForVoice("结束对话")
         childTurn(0) // 不会，主动求助。
         childTurn(1) // 只把除数扩大十倍，错误想法。
         voice.tap(); waitForVoice("一起聊聊")
         checkWork("same-work-paused-after-two-child-turns")
-        voice.tap(); waitForVoice("暂停对话")
+        voice.tap(); waitForVoice("结束对话")
         childTurn(2) // 换思路，两个数同时扩大十倍。
 
         // 不先按暂停，直接结束进程；不能只证明已主动保存后的冷启动。
@@ -76,7 +76,7 @@ final class WorkspaceMultiTurnRecoveryUITests: XCTestCase {
         XCTAssertEqual(voice.label, "一起聊聊")
         XCTAssertTrue(app.staticTexts["workspaceRestoredFeedback"].exists, "重开应能看到上次讨论")
         checkWork("same-work-reopened-without-explicit-pause")
-        voice.tap(); waitForVoice("暂停对话")
+        voice.tap(); waitForVoice("结束对话")
         childTurn(3) // 商的数位算错。
         childTurn(4) // 自行改正并检验。
         voice.tap(); waitForVoice("一起聊聊")

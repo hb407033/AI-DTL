@@ -65,9 +65,9 @@ final class FiveTopicPhotoLearningUITests: XCTestCase {
         let canvas = app.scrollViews["childCanvas"]
         XCTAssertTrue(canvas.waitForExistence(timeout: 15), app.debugDescription)
         let voice = app.buttons["workspaceVoice"]
-        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == '暂停对话' OR label == '重试对话'"), object: voice)
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == '结束对话' OR label == '重试对话'"), object: voice)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 90), .completed, app.debugDescription)
-        XCTAssertEqual(voice.label, "暂停对话", app.staticTexts["workspaceVoiceStatus"].label)
+        XCTAssertEqual(voice.label, "结束对话", app.staticTexts["workspaceVoiceStatus"].label)
         let replay = app.buttons["workspaceSyntheticVoice"]
         if !replay.isHittable {
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.9)).press(forDuration: 0.1,
@@ -88,7 +88,7 @@ final class FiveTopicPhotoLearningUITests: XCTestCase {
         waitForStatus("等待模拟孩子第3轮")
         voice.tap(); waitForVoice("一起聊聊")
         XCTAssertEqual(app.staticTexts["workspaceTestSession"].label, initialSession)
-        voice.tap(); waitForVoice("暂停对话")
+        voice.tap(); waitForVoice("结束对话")
         // 控制器等到真实续聊开场后才上传第3段；回放不会替 UI 自动重连。
         waitForStatus("等待模拟孩子第4轮")
         let beforeRestart = Int(app.staticTexts["workspaceTestRevision"].label) ?? -1
@@ -101,7 +101,7 @@ final class FiveTopicPhotoLearningUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(Int(app.staticTexts["workspaceTestRevision"].label) ?? -1, beforeRestart)
         XCTAssertEqual(voice.label, "一起聊聊", "退出重开不能自动开麦")
         XCTAssertTrue(app.staticTexts["workspaceRestoredFeedback"].exists)
-        voice.tap(); waitForVoice("暂停对话")
+        voice.tap(); waitForVoice("结束对话")
         if !replay.isHittable {
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.9)).press(forDuration: 0.1,
                 thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.4)))
