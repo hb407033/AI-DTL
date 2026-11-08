@@ -14,7 +14,7 @@
     <array>
         <string>/Users/hb-mini/.nvm/versions/node/v22.22.3/bin/node</string>
         <string>--env-file-if-exists=/Users/hb-mini/Library/Application Support/ai-dtl/.env.ai.local</string>
-        <string>/Users/hb-mini/Library/Application Support/ai-dtl/runtime/2026-11-08-teaching-v15/learning-tutor-teaching-v15.mjs</string>
+        <string>/Users/hb-mini/Library/Application Support/ai-dtl/runtime/2026-11-08-teaching-v16/learning-tutor-teaching-v16.mjs</string>
     </array>
     <key>WorkingDirectory</key><string>/Users/hb-mini/Library/Application Support/ai-dtl</string>
     <key>RunAtLoad</key><true/>
