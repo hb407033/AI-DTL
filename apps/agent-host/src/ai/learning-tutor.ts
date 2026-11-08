@@ -23,6 +23,8 @@ import { LearningSessionStore, type LearningSessionRecord } from "../learning/le
 import { TutorLearningActions } from "./tutor-learning-actions.js";
 import { loadQwenConfig, type QwenConfig } from "./config.js";
 import { registerWorkspaceRoutes } from "./workspace-route.js";
+import { registerWorkspaceSync } from "./workspace-sync-route.js";
+import { registerRealtimeCredentialRoute } from "./workspace-credential-route.js";
 import { WorkspaceStore } from "../learning/workspace-store.js";
 import { recognizePhoto } from "./qwen-workspace-session.js";
 import { WorkspaceVoiceProvider } from "./workspace-voice-provider.js";
@@ -157,6 +159,12 @@ export async function buildLearningTutor(config: QwenConfig | null, options: Lea
     config ? new QwenTeachingDecisionProvider(config, record => { void appendUsageJsonl(usageJsonlPath, record).catch(() => {}); })
       : { decide: async () => { throw Error("voiceUnavailable"); } },
     config?.decisionMode === "thinking");
+  registerWorkspaceSync(app, workspaceStore, usageJsonlPath);
+  // 口令文件放在作品库目录的上一级，不写进 workspaces-v2。
+  registerRealtimeCredentialRoute(app, {
+    directory: path.dirname(workspaceStore.directory),
+    loadCredential: () => config ? { apiKey: config.apiKey, url: config.url } : null,
+  });
   registerWorkspaceRoutes(app, workspaceStore, {
     recognize: async image => {
       if (!config || active.size) throw Error("recognitionUnavailable");

@@ -747,14 +747,16 @@ export class QwenTeachingDecisionProvider implements TeachingDecisionProvider {
 
 /** 决策完成后，语音拿不到照片/历史/儿童录音；全部缓冲并核对后才允许播放。 */
 export async function speakDecision(decision: TeachingDecision, acquire: () => WorkspaceVoice,
-  emit: (pcm: Buffer) => void, signal?: AbortSignal, context?: { sessionId: string; turnId: string }): Promise<void> {
+  emit: (pcm: Uint8Array) => void, signal?: AbortSignal, context?: { sessionId: string; turnId: string }): Promise<void> {
   const expected = mathSpeech(decision.utterance);
   for (let attempt = 0; attempt < 2; attempt++) {
     if (signal?.aborted) throw Error("aborted");
-    const voice = acquire(); const chunks: Buffer[] = []; let bytes = 0;
+    const voice = acquire(); const chunks: Uint8Array[] = []; let bytes = 0;
     try {
-      const text = await voice.respond(Buffer.alloc(6400), `这是纯语音播报，不是答题。不解释、不续写、不说吸气声。只逐字读这句话：${expected}`,
-        undefined, pcm => { bytes += pcm.length; if (bytes <= 1500000) chunks.push(pcm); }, signal, context);
+      // 静音帧用 Uint8Array，门禁包不必依赖 Node 的 Buffer。交给现有语音接口时再包一层。
+      const silence = new Uint8Array(6400);
+      const text = await voice.respond(Buffer.from(silence), `这是纯语音播报，不是答题。不解释、不续写、不说吸气声。只逐字读这句话：${expected}`,
+        undefined, pcm => { bytes += pcm.length; if (bytes <= 1500000) chunks.push(Uint8Array.from(pcm)); }, signal, context);
       if (signal?.aborted) throw Error("aborted");
       if (bytes > 0 && bytes <= 1500000 && matchesTeachingQuestion(mathSpeech(text), expected)) {
         chunks.forEach(emit); return;

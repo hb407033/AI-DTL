@@ -1,0 +1,1893 @@
+[
+  {
+    "name": "正常通过-小例子",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "先只画一段短路，在起点点一个点表示树。",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "hint",
+      "child": "我不会区分间隔和树，给一个小例子吧。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": true,
+      "draft": {
+        "problemId": "p",
+        "problemRevision": 0,
+        "turnId": "t",
+        "responseId": "r",
+        "child": "我不会区分间隔和树，给一个小例子吧。",
+        "focus": "clarify",
+        "observation": "孩子求助区分间隔和树",
+        "evidenceIds": [
+          "t"
+        ],
+        "resolved": [],
+        "utterance": "先只画一段短路，在起点点一个点表示树。",
+        "method": "ordinary",
+        "handoff": false
+      }
+    }
+  },
+  {
+    "name": "正常通过-核对问法",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "你写的是不是12吗？",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "review",
+      "child": "我先写了一步。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": true,
+      "draft": {
+        "problemId": "p",
+        "problemRevision": 0,
+        "turnId": "t",
+        "responseId": "r",
+        "child": "我先写了一步。",
+        "focus": "clarify",
+        "observation": "孩子求助区分间隔和树",
+        "evidenceIds": [
+          "t"
+        ],
+        "resolved": [],
+        "utterance": "你写的是不是12吗？",
+        "method": "ordinary",
+        "handoff": false
+      }
+    }
+  },
+  {
+    "name": "正常通过-承接想法",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "你说先标出两端，这两端各有一棵，中间还有几段？",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "review",
+      "child": "我先标出两端。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": true,
+      "draft": {
+        "problemId": "p",
+        "problemRevision": 0,
+        "turnId": "t",
+        "responseId": "r",
+        "child": "我先标出两端。",
+        "focus": "clarify",
+        "observation": "孩子求助区分间隔和树",
+        "evidenceIds": [
+          "t"
+        ],
+        "resolved": [],
+        "utterance": "你说先标出两端，这两端各有一棵，中间还有几段？",
+        "method": "ordinary",
+        "handoff": false,
+        "childMove": {
+          "move": "represent",
+          "evidenceId": "t"
+        }
+      }
+    }
+  },
+  {
+    "name": "正常通过-澄清词义",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "间隔是两棵树中间空着的那段路。",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "clarification",
+      "child": "间隔是什么意思？",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": true,
+      "draft": {
+        "problemId": "p",
+        "problemRevision": 0,
+        "turnId": "t",
+        "responseId": "r",
+        "child": "间隔是什么意思？",
+        "focus": "clarify",
+        "observation": "孩子求助区分间隔和树",
+        "evidenceIds": [
+          "t"
+        ],
+        "resolved": [],
+        "utterance": "间隔是两棵树中间空着的那段路。",
+        "method": "ordinary",
+        "handoff": false
+      }
+    }
+  },
+  {
+    "name": "正常通过-交还",
+    "draft": {
+      "focus": "return",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "接下来你自己试试。",
+      "method": "ordinary",
+      "handoff": true
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "review",
+      "child": "我明白了，自己再试一题。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": true,
+      "draft": {
+        "problemId": "p",
+        "problemRevision": 0,
+        "turnId": "t",
+        "responseId": "r",
+        "child": "我明白了，自己再试一题。",
+        "focus": "return",
+        "observation": "孩子求助区分间隔和树",
+        "evidenceIds": [
+          "t"
+        ],
+        "resolved": [],
+        "utterance": "接下来你自己试试。",
+        "method": "ordinary",
+        "handoff": true
+      }
+    }
+  },
+  {
+    "name": "多问-两问号",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "有几段？有几棵树？",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "hint",
+      "child": "我不会区分间隔和树，给一个小例子吧。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "questionLimit_onlyOneQuestion",
+      "rewrite": "有几段？"
+    }
+  },
+  {
+    "name": "多问-一问加一问",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "先数有几段？再数有几棵？",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "hint",
+      "child": "我不会区分间隔和树，给一个小例子吧。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "questionLimit_onlyOneQuestion",
+      "rewrite": "先数有几段？"
+    }
+  },
+  {
+    "name": "抢答-报出题干没有的棵数",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "要栽13棵。",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "review",
+      "child": "我还没算。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "unrequestedConclusion"
+    }
+  },
+  {
+    "name": "抢答-答案是",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "答案是13。",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "review",
+      "child": "我还没算。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "unrequestedConclusion"
+    }
+  },
+  {
+    "name": "口诀-移动小数点",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "试着把3.6的小数点向左移一位，再乘4看看？",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "hint",
+      "child": "我不会区分间隔和树，给一个小例子吧。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "roteStep"
+    }
+  },
+  {
+    "name": "口诀-末尾添零",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "末尾添0再乘就行，你先试试？",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "hint",
+      "child": "我不会区分间隔和树，给一个小例子吧。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "roteStep"
+    }
+  },
+  {
+    "name": "口诀-当成整数来乘",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "先当成整数来乘，再看小数点。",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "review",
+      "child": "这题怎么做？",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "roteStep"
+    }
+  },
+  {
+    "name": "断言孩子写的数",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "你算出的商是209。",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "review",
+      "child": "我算完了。",
+      "history": [],
+      "imageAttached": true,
+      "ocrNumbers": [
+        "209"
+      ]
+    },
+    "expect": {
+      "ok": false,
+      "reason": "assertsChildWriting"
+    }
+  },
+  {
+    "name": "断言卷子上的数",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "卷子上写的是209。",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "review",
+      "child": "我写好了。",
+      "history": [],
+      "imageAttached": true,
+      "ocrNumbers": [
+        "209"
+      ]
+    },
+    "expect": {
+      "ok": false,
+      "reason": "assertsChildWriting"
+    }
+  },
+  {
+    "name": "核对问法不拦",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "你写的是不是209？",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "review",
+      "child": "我写好了。",
+      "history": [],
+      "imageAttached": true,
+      "ocrNumbers": [
+        "209"
+      ]
+    },
+    "expect": {
+      "ok": true,
+      "draft": {
+        "problemId": "p",
+        "problemRevision": 0,
+        "turnId": "t",
+        "responseId": "r",
+        "child": "我写好了。",
+        "focus": "clarify",
+        "observation": "孩子求助区分间隔和树",
+        "evidenceIds": [
+          "t"
+        ],
+        "resolved": [],
+        "utterance": "你写的是不是209？",
+        "method": "ordinary",
+        "handoff": false
+      }
+    }
+  },
+  {
+    "name": "重复上问",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "先拿10米、每隔5米两端都栽的小路试试，看有几段、几棵树？",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "review",
+      "child": "我数了段数。",
+      "history": [
+        {
+          "problemId": "p",
+          "problemRevision": 0,
+          "turnId": "prior",
+          "responseId": "prior-r",
+          "child": "六十除以五是十二，我先答十二棵。",
+          "focus": "verify",
+          "observation": "孩子把间隔当棵数",
+          "evidenceIds": [
+            "prior"
+          ],
+          "resolved": [],
+          "utterance": "先拿10米、每隔5米两端都栽的小路试试，看有几段、几棵树？",
+          "method": "ordinary",
+          "handoff": false
+        }
+      ],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "repeatedQuestion"
+    }
+  },
+  {
+    "name": "明确重听不算重复",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "先拿10米、每隔5米两端都栽的小路试试，看有几段、几棵树？",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "clarification",
+      "child": "我没听清，刚才那句再说一遍。",
+      "history": [
+        {
+          "problemId": "p",
+          "problemRevision": 0,
+          "turnId": "prior",
+          "responseId": "prior-r",
+          "child": "六十除以五是十二，我先答十二棵。",
+          "focus": "verify",
+          "observation": "孩子把间隔当棵数",
+          "evidenceIds": [
+            "prior"
+          ],
+          "resolved": [],
+          "utterance": "先拿10米、每隔5米两端都栽的小路试试，看有几段、几棵树？",
+          "method": "ordinary",
+          "handoff": false
+        }
+      ],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": true,
+      "draft": {
+        "problemId": "p",
+        "problemRevision": 0,
+        "turnId": "t",
+        "responseId": "r",
+        "child": "我没听清，刚才那句再说一遍。",
+        "focus": "clarify",
+        "observation": "孩子求助区分间隔和树",
+        "evidenceIds": [
+          "t"
+        ],
+        "resolved": [],
+        "utterance": "先拿10米、每隔5米两端都栽的小路试试，看有几段、几棵树？",
+        "method": "ordinary",
+        "handoff": false
+      }
+    }
+  },
+  {
+    "name": "字数超过90",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "我们先只看一小段路，从起点开始一棵一棵点，点到这一小段结束，再回头数有几段空格、有几棵树，先不要算整条路。我们先只看一小段路，从起点开始一棵一棵点，点到这一小段结束，再回头数有几段空格、有几棵树，先不要算整条路。",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "hint",
+      "child": "我不会区分间隔和树，给一个小例子吧。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "invalidStructure"
+    }
+  },
+  {
+    "name": "空洞应声",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "好的。",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "hint",
+      "child": "我不会区分间隔和树，给一个小例子吧。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "needsNextStep"
+    }
+  },
+  {
+    "name": "是非问接不住",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "这样好算吗？",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "hint",
+      "child": "我不会区分间隔和树，给一个小例子吧。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "hintNeedsAction"
+    }
+  },
+  {
+    "name": "能力标签",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "你已经掌握了。",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "review",
+      "child": "我做对了。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "abilityLabel_notAllowed"
+    }
+  },
+  {
+    "name": "动作名念出来",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "请做 represent 这一步。",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "hint",
+      "child": "我不会区分间隔和树，给一个小例子吧。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "moveTermInUtterance"
+    }
+  },
+  {
+    "name": "没有图却说看见画了",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "你画了一棵树，再数数有几段？",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "hint",
+      "child": "我不会区分间隔和树，给一个小例子吧。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "fabricatedImageClaim"
+    }
+  },
+  {
+    "name": "证据编号不存在",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "missing"
+      ],
+      "utterance": "先只画一段短路，在起点点一个点表示树。",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "hint",
+      "child": "我不会区分间隔和树，给一个小例子吧。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "invalidEvidence"
+    }
+  },
+  {
+    "name": "漏引本轮",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "problem"
+      ],
+      "utterance": "先只画一段短路，在起点点一个点表示树。",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "hint",
+      "child": "我不会区分间隔和树，给一个小例子吧。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "latestEvidenceRequired"
+    }
+  },
+  {
+    "name": "澄清权限答成别的焦点",
+    "draft": {
+      "focus": "verify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "你想用什么办法检查？",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "clarification",
+      "child": "间隔是什么意思？",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "notAuthorized"
+    }
+  },
+  {
+    "name": "交还却还在问",
+    "draft": {
+      "focus": "return",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "接下来你自己试试吗？",
+      "method": "ordinary",
+      "handoff": true
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "review",
+      "child": "我想自己试试。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "handoffMustBe_true"
+    }
+  },
+  {
+    "name": "为什么原样抛回",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "为什么间隔和树不一样？",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "hint",
+      "child": "我不懂为什么要多算一棵？",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "whyEchoNeedsHelp"
+    }
+  },
+  {
+    "name": "开场直接指错",
+    "draft": {
+      "focus": "clarify",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "这个零是多余的吗？",
+      "method": "ordinary",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "植树问题"
+          },
+          "statement": {
+            "text": "60米的小路一侧，每隔5米栽一棵，两端都栽，一共多少棵？",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "review",
+      "child": "",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "openingPointsAtError"
+    }
+  },
+  {
+    "name": "小数除法抢答正确商",
+    "draft": {
+      "focus": "transformation",
+      "observation": "孩子求助区分间隔和树",
+      "evidenceIds": [
+        "t"
+      ],
+      "utterance": "先看看被除数，商是25。",
+      "method": "scale_both",
+      "handoff": false
+    },
+    "context": {
+      "record": {
+        "schemaVersion": 2,
+        "sessionId": "gates",
+        "eventId": "initial",
+        "revision": 0,
+        "problem": {
+          "source": "curated",
+          "problemId": "p",
+          "challengeId": "c",
+          "packVersion": "1",
+          "curriculum": {
+            "edition": "人教版",
+            "grade": 5,
+            "term": "上",
+            "currentUnit": "小数除法"
+          },
+          "statement": {
+            "text": "12.5÷0.5",
+            "revision": 0,
+            "confirmed": true
+          }
+        },
+        "phase": "exploring",
+        "childInkBase64": "",
+        "board": {
+          "revision": 0,
+          "rectangles": []
+        },
+        "submissions": [],
+        "feedback": [],
+        "openQuestions": []
+      },
+      "turnId": "t",
+      "responseId": "r",
+      "permission": "review",
+      "child": "我还没算出来。",
+      "history": [],
+      "imageAttached": false,
+      "ocrNumbers": []
+    },
+    "expect": {
+      "ok": false,
+      "reason": "answerLeak"
+    }
+  }
+]

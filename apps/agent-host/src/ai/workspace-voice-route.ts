@@ -73,7 +73,7 @@ export function registerWorkspaceVoice(app: FastifyInstance, store: WorkspaceSto
       // 复核期间提前合成草稿的语音（只缓冲、不发送）；最终一句与草稿逐字相同才复用，否则丢弃重合成。
       // 同一时刻只允许一个语音连接，所以前一段提前合成结束后才开下一段。
       const speakContext = { sessionId: record.sessionId, turnId };
-      let early: { utterance: string; abort: AbortController; done: Promise<Buffer[] | undefined> } | undefined;
+      let early: { utterance: string; abort: AbortController; done: Promise<Uint8Array[] | undefined> } | undefined;
       let earlyChain: Promise<unknown> = Promise.resolve();
       const onDraft = (draft: TeachingDecision) => {
         if (early?.utterance === draft.utterance) return;
@@ -81,7 +81,7 @@ export function registerWorkspaceVoice(app: FastifyInstance, store: WorkspaceSto
         const abort = new AbortController();
         const stop = () => abort.abort();
         requestSignal.addEventListener("abort", stop, { once: true });
-        const chunks: Buffer[] = [];
+        const chunks: Uint8Array[] = [];
         const done = earlyChain.then(() => abort.signal.aborted ? undefined
           : speakDecision(draft, () => { provider = acquire(); return provider; }, pcm => chunks.push(pcm), abort.signal, speakContext).then(() => chunks))
           .catch(() => undefined).finally(() => requestSignal.removeEventListener("abort", stop));
@@ -105,12 +105,12 @@ export function registerWorkspaceVoice(app: FastifyInstance, store: WorkspaceSto
       }
       finishThinking("thinkingEnd", capturedEpoch);
       checkEpoch(capturedEpoch);
-      let approvedAudio: Buffer[] | undefined;
+      let approvedAudio: Uint8Array[] | undefined;
       if (early && early.utterance === decision.utterance) approvedAudio = await early.done;
       else { early?.abort.abort(); await earlyChain; }
       checkEpoch(capturedEpoch);
       if (!approvedAudio) {
-        const fresh: Buffer[] = [];
+        const fresh: Uint8Array[] = [];
         await speakDecision(decision, () => { provider = acquire(); return provider; }, pcm => fresh.push(pcm), requestSignal, speakContext);
         approvedAudio = fresh;
       }
@@ -128,7 +128,7 @@ export function registerWorkspaceVoice(app: FastifyInstance, store: WorkspaceSto
       feedback.summary = decision.utterance; feedback.contested = false;
       const saved = await save(latest, randomUUID(), decision, capturedEpoch);
       if (capturedEpoch !== epoch || closed) return saved;
-      approvedAudio.forEach(pcm => send({ type: "audio", turnId, responseId, pcm: pcm.toString("base64") }));
+      approvedAudio.forEach(pcm => send({ type: "audio", turnId, responseId, pcm: Buffer.from(pcm).toString("base64") }));
       send({ type: "responseDone", turnId, responseId, text: decision.utterance, record: saved });
       pendingResponse = undefined;
       return saved;

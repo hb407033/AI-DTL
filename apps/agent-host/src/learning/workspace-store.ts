@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { promises as fs, renameSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -26,6 +27,7 @@ function validTeachingDecisions(bundle: Bundle): TeachingDecision[] {
     && record.feedback.some(f => f.responseId === d.responseId && f.turnId === d.turnId && !f.contested && f.summary === d.utterance));
 }
 const queues = new Map<string, Promise<unknown>>();
+const sessionOwner = new AsyncLocalStorage<string>();
 const digest = (data: string | Buffer) => createHash("sha256").update(data).digest("hex");
 const validId = (id: string) => { if (!workspaceIdSchema.safeParse(id).success) throw Error("invalidId"); };
 async function exists(file: string) {
@@ -54,8 +56,10 @@ export class WorkspaceStore {
   private tombstone(id: string) { validId(id); return path.join(this.directory, `${id}.deleted`); }
   private async serial<T>(id: string, work: () => Promise<T>): Promise<T> {
     const key = this.file(id);
+    // 同一会话锁里再保存作品时直接执行，避免批次写入自己把自己卡住。
+    if (sessionOwner.getStore() === key) return work();
     const prior = queues.get(key) ?? Promise.resolve();
-    const task = prior.catch(() => {}).then(work);
+    const task = prior.catch(() => {}).then(() => sessionOwner.run(key, work));
     queues.set(key, task);
     try { return await task; } finally { if (queues.get(key) === task) queues.delete(key); }
   }
@@ -249,6 +253,9 @@ export class WorkspaceStore {
         if (previous.hash !== hash || previous.kind !== kind) throw Error("eventConflict");
         return previous.id;
       }
+      // 不同事件的同一张图只保留一份文件，返回已有 mediaId。
+      const sameBytes = bundle.media.find(m => m.hash === hash && m.kind === kind);
+      if (sameBytes) return sameBytes.id;
       if (bundle.media.length >= 200) throw Error("sessionLimit");
       const mediaId = randomUUID();
       const directory = path.join(this.directory, `${id}-media`);
@@ -268,5 +275,42 @@ export class WorkspaceStore {
     const data = await fs.readFile(path.join(this.directory, `${id}-media`, mediaId));
     if (digest(data) !== entry.hash) throw Error("corruptMedia");
     return { data, mime: entry.mime };
+  }
+  /** 同一会话的保存、批次和台账串行，避免两路请求互相覆盖。 */
+  async withSessionLock<T>(id: string, work: () => Promise<T>): Promise<T> {
+    return this.serial(id, work);
+  }
+  private syncBatchFile(id: string) { validId(id); return path.join(this.directory, `${id}-sync-batches.jsonl`); }
+  /** 最后一条状态为准。只有 applied 表示这批已经完整落盘。 */
+  async readSyncBatch(id: string, batchId: string): Promise<"missing" | "pending" | "applied"> {
+    validId(id);
+    if (!/^[A-Za-z0-9-]{1,80}$/.test(batchId)) throw Error("invalidId");
+    let raw = "";
+    try { raw = await fs.readFile(this.syncBatchFile(id), "utf8"); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return "missing"; throw error; }
+    let state: "missing" | "pending" | "applied" = "missing";
+    for (const line of raw.split("\n")) {
+      if (!line.trim()) continue;
+      const parsed = JSON.parse(line) as { batchId?: string; state?: string };
+      if (parsed.batchId !== batchId) continue;
+      if (parsed.state === "pending" || parsed.state === "applied") state = parsed.state;
+    }
+    return state;
+  }
+  async markSyncBatch(id: string, batchId: string, state: "pending" | "applied"): Promise<void> {
+    validId(id);
+    if (!/^[A-Za-z0-9-]{1,80}$/.test(batchId)) throw Error("invalidId");
+    await fs.mkdir(this.directory, { recursive: true });
+    await fs.appendFile(this.syncBatchFile(id), `${JSON.stringify({ batchId, state })}\n`);
+  }
+  /**
+   * 计划里的布尔接口：false 表示整批已经 applied，可以当重复。
+   * pending 或不存在都返回 true，调用方必须继续把决策、回合和用量写完，不能把 pending 当成已消费。
+   */
+  async recordSyncBatch(id: string, batchId: string): Promise<boolean> {
+    const phase = await this.readSyncBatch(id, batchId);
+    if (phase === "applied") return false;
+    if (phase === "missing") await this.markSyncBatch(id, batchId, "pending");
+    return true;
   }
 }
