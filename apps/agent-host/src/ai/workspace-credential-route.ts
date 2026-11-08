@@ -1,5 +1,6 @@
 // 家长在局域网用 6 位口令领取一次实时模型地址。文件里只有口令和过期时间，没有密钥。
 // 密钥由进程内的配置读取，成功后立即删文件。不写日志。明文 HTTP 与现有 8791 宿主相同，不另开端口。
+// 这只适合家长信任的家庭局域网，还没有达到可以对外发布的安全标准。不要把它说成安全传输。
 import { timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";

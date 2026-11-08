@@ -110,6 +110,7 @@ final class TutorConductor: ObservableObject {
     func interrupt() {
         audio.stopPlayback()
         session.cancelResponse()
+        slowPath?.cancel()
         bufferedAudio = []
         interruptedNote = true
         stage = .idle
@@ -210,7 +211,12 @@ final class TutorConductor: ObservableObject {
             stage = .idle
             return
         }
+        let ticket = slowPath.token()
+        let turn = turnId
         let result = await slowPath.run(context: gate, rejectedReason: reason)
+        // 取消、卸载或已经进入下一轮时，旧的改写和声音都不能再播出来。
+        guard slowPath.isCurrent(ticket), stage == .awaitingReply, turnId == turn, !Task.isCancelled else { return }
+        if case .failed(let code) = result, code == "cancelled" { return }
         switch result {
         case .spoken(let rewritten, let pcm):
             audio.beginResponse()

@@ -46,6 +46,7 @@ enum TeachingGatesError: Error { case scriptMissing, exception(String), invalidR
 final class TeachingGates {
     private let context = JSContext()!
     private var lastException: String?
+    private var activeSlow: SlowBridge?
 
     init(script: String? = nil) throws {
         let source: String
@@ -97,54 +98,75 @@ final class TeachingGates {
     func headerInstructions() -> String { (try? call("headerInstructions", []))?.toString() ?? "" }
     func replyInstructions(kind: TurnKind) -> String { (try? call("replyInstructions", [kind.rawValue]))?.toString() ?? "" }
 
-    /// JS 的 Promise 回调留在这个上下文里，等 Swift 挂起结束后再在主线程 resolve。
+    /// 取消还在跑的慢路径。未完成的 Promise 会被拒绝，之后的 resolve 不再生效。
+    func cancelSlow() { activeSlow?.cancel() }
+
+    /// JS 的 Promise 回调留在这个上下文里。取消时拒绝 Promise，避免旧响应再被采用。
     func decideSlow(context gate: GateContext, rejectedReason: String,
                     requestText: @escaping (String, Data?) async throws -> String,
                     speak: @escaping (String) async throws -> (ok: Bool, spoken: String)) async throws -> String {
+        cancelSlow()
+        let bridge = SlowBridge()
+        activeSlow = bridge
         let hooks = JSValue(newObjectIn: context)!
         let requestBlock: @convention(block) (String, String?) -> JSValue = { [context] instructions, imageBase64 in
-            JSValue(newPromiseIn: context) { resolve, reject in
-                let keptResolve = resolve
-                let keptReject = reject
-                Task { @MainActor in
-                    do {
-                        let image = imageBase64.flatMap { Data(base64Encoded: $0) }
-                        let text = try await requestText(instructions, image)
-                        keptResolve?.call(withArguments: [text])
-                    } catch {
-                        keptReject?.call(withArguments: ["requestTextFailed"])
-                    }
-                }
-            }
+            self.promise(bridge: bridge, on: context, reject: "requestTextFailed", body: {
+                try await requestText(instructions, imageBase64.flatMap { Data(base64Encoded: $0) })
+            }, value: { $0 })
         }
         let speakBlock: @convention(block) (String) -> JSValue = { [context] text in
-            JSValue(newPromiseIn: context) { resolve, reject in
-                let keptResolve = resolve
-                let keptReject = reject
-                Task { @MainActor in
-                    do {
-                        let spoken = try await speak(text)
-                        let object = JSValue(newObjectIn: context)!
-                        object.setObject(spoken.ok, forKeyedSubscript: "ok" as NSString)
-                        object.setObject(spoken.spoken, forKeyedSubscript: "spoken" as NSString)
-                        keptResolve?.call(withArguments: [object])
-                    } catch {
-                        keptReject?.call(withArguments: ["speakFailed"])
-                    }
-                }
-            }
+            self.promise(bridge: bridge, on: context, reject: "speakFailed", body: {
+                try await speak(text)
+            }, value: { spoken in
+                let object = JSValue(newObjectIn: context)!
+                object.setObject(spoken.ok, forKeyedSubscript: "ok" as NSString)
+                object.setObject(spoken.spoken, forKeyedSubscript: "spoken" as NSString)
+                return object
+            })
         }
         hooks.setObject(requestBlock, forKeyedSubscript: "requestText" as NSString)
         hooks.setObject(speakBlock, forKeyedSubscript: "speak" as NSString)
         guard let promise = try call("decideSlow", [try json(gate), rejectedReason, hooks]) else { throw TeachingGatesError.invalidResult }
-        return try await withCheckedThrowingContinuation { continuation in
-            let success: @convention(block) (JSValue) -> Void = { value in
-                continuation.resume(returning: value.toString())
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+                bridge.continuation = continuation
+                let success: @convention(block) (JSValue) -> Void = { value in
+                    bridge.finish { $0.resume(returning: value.toString()) }
+                }
+                let failure: @convention(block) (JSValue) -> Void = { value in
+                    bridge.finish { $0.resume(throwing: TeachingGatesError.exception(value.toString())) }
+                }
+                promise.invokeMethod("then", withArguments: [success, failure])
             }
-            let failure: @convention(block) (JSValue) -> Void = { value in
-                continuation.resume(throwing: TeachingGatesError.exception(value.toString()))
+        } onCancel: {
+            Task { @MainActor in bridge.cancel() }
+        }
+    }
+
+    private func promise<T>(bridge: SlowBridge, on context: JSContext, reject name: String,
+                            body: @escaping () async throws -> T, value: @escaping (T) -> Any) -> JSValue {
+        JSValue(newPromiseIn: context) { resolve, reject in
+            let keptResolve = resolve
+            let keptReject = reject
+            let claim = SlowClaim()
+            let task = Task { @MainActor in
+                do {
+                    try Task.checkCancellation()
+                    let result = try await body()
+                    try Task.checkCancellation()
+                    guard claim.take() else { return }
+                    keptResolve?.call(withArguments: [value(result)])
+                } catch {
+                    guard claim.take() else { return }
+                    keptReject?.call(withArguments: [name])
+                }
             }
-            promise.invokeMethod("then", withArguments: [success, failure])
+            bridge.tasks.append(task)
+            bridge.rejectors.append {
+                guard claim.take() else { return }
+                task.cancel()
+                keptReject?.call(withArguments: [name])
+            }
         }
     }
 
@@ -170,5 +192,39 @@ final class TeachingGates {
         }
         return GateVerdict(ok: json["ok"] as? Bool ?? false, reason: json["reason"] as? String,
                            rewrite: json["rewrite"] as? String, draftJSON: draft)
+    }
+}
+
+@MainActor
+private final class SlowBridge {
+    var tasks: [Task<Void, Never>] = []
+    var rejectors: [() -> Void] = []
+    var continuation: CheckedContinuation<String, Error>?
+    private var finished = false
+
+    func finish(_ body: (CheckedContinuation<String, Error>) -> Void) {
+        guard !finished, let continuation else { return }
+        finished = true
+        self.continuation = nil
+        body(continuation)
+    }
+
+    func cancel() {
+        let pending = rejectors
+        rejectors.removeAll()
+        pending.forEach { $0() }
+        tasks.forEach { $0.cancel() }
+        tasks.removeAll()
+        finish { $0.resume(throwing: CancellationError()) }
+    }
+}
+
+@MainActor
+private final class SlowClaim {
+    private var taken = false
+    func take() -> Bool {
+        if taken { return false }
+        taken = true
+        return true
     }
 }

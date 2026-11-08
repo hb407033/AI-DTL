@@ -58,6 +58,7 @@ final class WorkspaceClient: ObservableObject {
     private var socket: (any WorkspaceTransport)?
     private var realtimeActive = false
     private var conductor: TutorConductor?
+    private var slowPath: SlowPath?
     private var realtimeSession: RealtimeSession?
     private var outbox: SyncOutbox?
     private var outboxSeq = 0
@@ -155,6 +156,23 @@ final class WorkspaceClient: ObservableObject {
         return args.indices.contains(next) && args[next] == "YES"
     }
 
+    /// 应用实际使用的慢路径。文字请求走思考模型的 HTTPS，朗读用一条临时实时连接。测试只替换传输。
+    static func makeRealtimeSlowPath(gates: TeachingGates, credentialURL: URL, apiKey: String,
+                                     textTimeout: Duration = .seconds(45), speechTimeout: Duration = .seconds(45),
+                                     textTransport: @escaping @MainActor (URLRequest) async throws -> (Data, HTTPURLResponse),
+                                     makeSpeechSession: @escaping @MainActor (URL, String) -> RealtimeSession) -> SlowPath {
+        let lifetime = SlowPathLifetime()
+        let slow = SlowPath(gates: gates, requestText: { instructions, image in
+            try await ThinkingTextClient.request(instructions: instructions, image: image, credentialURL: credentialURL,
+                                                 apiKey: apiKey, timeout: textTimeout, transport: textTransport)
+        }, speak: { text in
+            try await RealtimeSpeechSynthesis.speak(text, credentialURL: credentialURL, apiKey: apiKey,
+                                                    timeout: speechTimeout, makeSession: makeSpeechSession)
+        }, lifetime: lifetime)
+        lifetime.addCancel { gates.cancelSlow() }
+        return slow
+    }
+
     private func startRealtimeIfEnabled(host: String, microphone: Bool) -> Bool {
         let endpoint: (url: URL, apiKey: String)?
         #if DEBUG
@@ -171,7 +189,12 @@ final class WorkspaceClient: ObservableObject {
         catch { status = "实时对话没准备好，仍用原来的主机对话。"; return false }
         let session = RealtimeSession(url: endpoint.url, apiKey: endpoint.apiKey)
         let audioPlayer = audio
-        let slow = SlowPath(gates: gates, requestText: { _, _ in throw RealtimeKeyError.unavailable }, speak: { text in (Data(), text) })
+        let slow = Self.makeRealtimeSlowPath(gates: gates, credentialURL: endpoint.url, apiKey: endpoint.apiKey, textTransport: { request in
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else { throw ThinkingTextError.invalidResponse }
+            return (data, http)
+        }, makeSpeechSession: { url, key in RealtimeSession(url: url, apiKey: key) })
+        self.slowPath = slow
         let conductor = TutorConductor(session: session, gates: gates, audio: audioPlayer, slowPath: slow, context: { [weak self] in
             self?.gateContext() ?? GateContext(record: WorkspaceClient.placeholderRecord, turnId: "t", responseId: "r",
                                                permission: "hint", child: "", history: [], imageAttached: false, ocrNumbers: [])
@@ -652,6 +675,8 @@ final class WorkspaceClient: ObservableObject {
         if error is URLError { recoverConnection() } else { fail() }
     }
     func pause() {
+        slowPath?.cancel()
+        slowPath = nil
         generation = UUID(); operation = UUID(); turnSubmitted = false
         rearm?.cancel(); reconnectTask?.cancel(); audio.stop()
         socket?.close(); socket = nil

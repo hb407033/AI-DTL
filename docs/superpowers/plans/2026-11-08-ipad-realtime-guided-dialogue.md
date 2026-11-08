@@ -170,6 +170,7 @@
 
 - [x] **Step 1: 写失败测试**：`testRewriteAcceptedWhenGatePassesAndSpeechMatches`（假 requestText 返回合法 JSON，假 speak 返回同文）、`testSpeechNumberMismatchRetriesOnceThenFails`、`testRequestTextErrorYieldsFailedCodeNotCrash`。
 - [x] **Step 2–4: 失败 → 实现 → 通过 → Commit。**
+- [x] **应用接线**：`WorkspaceClient.makeRealtimeSlowPath` 使用与 `qwen-thinking-text.ts` 相同的 HTTPS 请求，并用临时实时连接朗读。明文地址不发送密钥。取消、超时、数字不一致都不会把旧声音播出来。
 
 ### Task 7: Conductor 接慢路径、失败表、打断
 
