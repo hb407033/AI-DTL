@@ -116,6 +116,34 @@ final class WorkspaceClientTests: XCTestCase {
         XCTAssertEqual(transport.sent.filter { $0["type"] as? String == "hello" }.count, 1)
         XCTAssertEqual(prompts.count, 4)
     }
+    func testAcknowledgesRightAwayWhenTeacherWillReplyAndVariesWording() async throws {
+        let record = try fixture(), transport = WorkspaceTestTransport()
+        let client = WorkspaceClient(transportFactory: { _ in transport }); client.record = { record }
+        var prompts: [String] = []
+        client.speakPrompt = { prompts.append($0) }
+        client.connect(host: "127.0.0.1", microphone: false, conversationMode: "dialogue")
+        defer { client.pause() }
+        try transport.emit(["type": "ready"]); try await eventually { client.connected }
+        // 只是自己说想法、老师不接话时，不应答。
+        client.submitPCM(Data(repeating: 0, count: 3200))
+        try await eventually { transport.sent.filter { $0["type"] as? String == "voiceEnd" }.count == 1 }
+        var turn = try XCTUnwrap(transport.sent.last?["turnId"] as? String)
+        client.receive(["type": "transcript", "turnId": turn, "text": "我自己想想", "action": "uncertain"])
+        XCTAssertTrue(prompts.isEmpty)
+        // 老师要回复时：转写一到就先说一句短应答，孩子不用在沉默里等 5 秒（2026-11-08 真机反馈）。
+        for index in 0..<2 {
+            client.submitPCM(Data(repeating: 0, count: 3200))
+            try await eventually { transport.sent.filter { $0["type"] as? String == "voiceEnd" }.count == index + 2 }
+            turn = try XCTUnwrap(transport.sent.last?["turnId"] as? String)
+            client.receive(["type": "transcript", "turnId": turn, "text": "帮我一下", "action": "help"])
+            XCTAssertEqual(prompts.count, index + 1)
+            XCTAssertTrue(WorkspaceClient.acknowledgements.contains(prompts[index]))
+            client.receive(["type": "responseStart", "turnId": turn, "responseId": "r\(index)"])
+            client.receive(["type": "responseDone", "turnId": turn, "responseId": "r\(index)", "text": "先看一米。"])
+            try await eventually { !client.working }
+        }
+        XCTAssertNotEqual(prompts[0], prompts[1], "连续两轮不重复同一句")
+    }
     func testInterruptBuffersNewSpeechWhileSettlementExceedsThreeSeconds() async throws {
         let record = try fixture(), transport = WorkspaceTestTransport()
         let client = WorkspaceClient(transportFactory: { _ in transport }); client.record = { record }

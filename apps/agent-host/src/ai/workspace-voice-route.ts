@@ -70,9 +70,26 @@ export function registerWorkspaceVoice(app: FastifyInstance, store: WorkspaceSto
         ledgerSummary: await store.loadThinkingMoveSummary() };
       checkEpoch(capturedEpoch);
       if (thinkingMode) { activeThinking = { turnId, responseId, epoch: capturedEpoch }; send({ type: "thinkingStart", turnId, responseId }); }
+      // 复核期间提前合成草稿的语音（只缓冲、不发送）；最终一句与草稿逐字相同才复用，否则丢弃重合成。
+      // 同一时刻只允许一个语音连接，所以前一段提前合成结束后才开下一段。
+      const speakContext = { sessionId: record.sessionId, turnId };
+      let early: { utterance: string; abort: AbortController; done: Promise<Buffer[] | undefined> } | undefined;
+      let earlyChain: Promise<unknown> = Promise.resolve();
+      const onDraft = (draft: TeachingDecision) => {
+        if (early?.utterance === draft.utterance) return;
+        early?.abort.abort();
+        const abort = new AbortController();
+        const stop = () => abort.abort();
+        requestSignal.addEventListener("abort", stop, { once: true });
+        const chunks: Buffer[] = [];
+        const done = earlyChain.then(() => abort.signal.aborted ? undefined
+          : speakDecision(draft, () => { provider = acquire(); return provider; }, pcm => chunks.push(pcm), abort.signal, speakContext).then(() => chunks))
+          .catch(() => undefined).finally(() => requestSignal.removeEventListener("abort", stop));
+        earlyChain = done; early = { utterance: draft.utterance, abort, done };
+      };
       let decision: TeachingDecision;
       try {
-        const raw = await decisions!.decide(input, requestSignal);
+        const raw = await decisions!.decide(input, requestSignal, onDraft);
         checkEpoch(capturedEpoch);
         // 思考等待期间另一件作品可能被删除或更正；引用校验使用此刻有效的投影。
         input.history = await store.loadTeachingDecisions(record.sessionId);
@@ -82,14 +99,21 @@ export function registerWorkspaceVoice(app: FastifyInstance, store: WorkspaceSto
         // 这里再拦会把已放行的回复作废（2026-10-16 真机：焦点放行后被路由复检拒绝，孩子得不到回应）。
         decision = validateTeachingDecision(raw, input, { softGates: true });
       } catch (e) {
+        early?.abort.abort();
         finishThinking("thinkingCancel", capturedEpoch);
         throw e;
       }
       finishThinking("thinkingEnd", capturedEpoch);
       checkEpoch(capturedEpoch);
-      const approvedAudio: Buffer[] = [];
-      await speakDecision(decision, () => { provider = acquire(); return provider; }, pcm => approvedAudio.push(pcm),
-        requestSignal, { sessionId: record.sessionId, turnId });
+      let approvedAudio: Buffer[] | undefined;
+      if (early && early.utterance === decision.utterance) approvedAudio = await early.done;
+      else { early?.abort.abort(); await earlyChain; }
+      checkEpoch(capturedEpoch);
+      if (!approvedAudio) {
+        const fresh: Buffer[] = [];
+        await speakDecision(decision, () => { provider = acquire(); return provider; }, pcm => fresh.push(pcm), requestSignal, speakContext);
+        approvedAudio = fresh;
+      }
       provider = undefined;
       if (capturedEpoch !== epoch || closed) throw Error("aborted");
       // TTS 本身也可能等待数秒；旧作品在此期间被删除/更正后，缓冲语音不能再引用它。

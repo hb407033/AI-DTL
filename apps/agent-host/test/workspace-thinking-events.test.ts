@@ -20,7 +20,7 @@ function makeDecision(input: TeachingInput): TeachingDecision {
   };
 }
 
-async function setup(thinkingMode: boolean, decideImpl?: (input: TeachingInput, signal?: AbortSignal) => Promise<TeachingDecision>,
+async function setup(thinkingMode: boolean, decideImpl?: (input: TeachingInput, signal?: AbortSignal, onDraft?: (d: TeachingDecision) => void) => Promise<TeachingDecision>,
   onSpeech?: (instructions: string, image: Buffer | undefined) => void) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "ws-thinking-"));
   const store = new WorkspaceStore({ directory });
@@ -37,7 +37,7 @@ async function setup(thinkingMode: boolean, decideImpl?: (input: TeachingInput, 
       onSpeech?.(instructions, _img);
       const match = instructions.match(/只逐字读这句话：(.+)/s);
       const text = match ? match[1]!.trim() : "每米就是一米的价钱。";
-      audio(Buffer.from("a")); return text;
+      audio(Buffer.from(text)); return text;
     } }),
     undefined, provider, thinkingMode);
   return { directory, app, store, previewId };
@@ -197,4 +197,43 @@ test("非 thinkingMode 不发出思考态事件", async () => {
     await wait("responseDone", start);
     expect(messages.slice(start).some(m => m.type === "thinkingStart")).toBe(false);
   } finally { ws.close(); await app.close(); await rm(directory, { recursive: true }); }
+});
+
+test("复核期间提前合成草稿语音；终稿与草稿相同则复用，只合成一次", async () => {
+  const speechStarted = deferred<void>();
+  const spoken: string[] = [];
+  const { directory, app, previewId } = await setup(false, async (input, _signal, onDraft) => {
+    const draft = makeDecision(input);
+    onDraft?.(draft);
+    await speechStarted.promise; // 模拟语义复核耗时：复核结束前语音已开始合成
+    return draft;
+  }, instructions => { spoken.push(instructions); speechStarted.resolve(); });
+  const connection = await connect(app);
+  try {
+    const start = connection.messages.length;
+    await authorizeReview(connection, previewId);
+    await connection.wait("responseDone", start);
+    const audio = connection.messages.slice(start).filter(m => m.type === "audio");
+    expect(audio.map(m => Buffer.from(m.pcm, "base64").toString())).toEqual(["每米就是一米的价钱。"]);
+    expect(spoken).toHaveLength(1);
+  } finally { connection.ws.close(); await app.close(); await rm(directory, { recursive: true }); }
+});
+
+test("复核后终稿改了，丢弃草稿语音，只播终稿", async () => {
+  const speechStarted = deferred<void>();
+  const spoken: string[] = [];
+  const { directory, app, previewId } = await setup(false, async (input, _signal, onDraft) => {
+    onDraft?.({ ...makeDecision(input), utterance: "草稿这句不该播出来。" });
+    await speechStarted.promise;
+    return makeDecision(input);
+  }, instructions => { spoken.push(instructions); speechStarted.resolve(); });
+  const connection = await connect(app);
+  try {
+    const start = connection.messages.length;
+    await authorizeReview(connection, previewId);
+    await connection.wait("responseDone", start);
+    const audio = connection.messages.slice(start).filter(m => m.type === "audio");
+    expect(audio.map(m => Buffer.from(m.pcm, "base64").toString())).toEqual(["每米就是一米的价钱。"]);
+    expect(spoken).toHaveLength(2);
+  } finally { connection.ws.close(); await app.close(); await rm(directory, { recursive: true }); }
 });

@@ -46,6 +46,14 @@ final class WorkspaceClient: ObservableObject {
     var evidence: ((String) async throws -> WorkspaceEvidence)?
     var acceptScaffold: ((LineScaffoldJournal) -> Void)?
     private let audio = TutorAudioIO()
+    /// 本机短应答，轮换使用；不含教学内容，不替老师表态对错。
+    static let acknowledgements = ["嗯，我想想。", "好，我看看。", "嗯，让我想一下。", "好，我来看一看。"]
+    private var acknowledgementIndex = 0
+    private func acknowledge() {
+        let text = Self.acknowledgements[acknowledgementIndex % Self.acknowledgements.count]
+        acknowledgementIndex += 1
+        if let speakPrompt { speakPrompt(text) } else { audio.say(text) }
+    }
     static let mutedNotice = "iPad 音量是 0，听不到老师说话。按侧面的音量加键调大。"
     private var socket: (any WorkspaceTransport)?
     private let transportFactory: (URL) -> any WorkspaceTransport
@@ -401,7 +409,10 @@ final class WorkspaceClient: ObservableObject {
                !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let problem = record?()?.problem {
                 latestExpression = (problem.problemId, problem.statement.revision, transcript)
             }
-            if let action = event["action"] as? String, ["review", "help", "correct"].contains(action) { authorize(action) }
+            if let action = event["action"] as? String, ["review", "help", "correct"].contains(action) {
+                // 老师要想几秒才能回复：转写一到就在本机先应一声，让孩子知道被听见了，不在沉默里干等。
+                acknowledge(); authorize(action)
+            }
             else { completedTurns += 1; status = "已听见。你可以继续想；想请老师讲题意时点“解释题意”。"; scheduleListening() }
         case "responseStart":
             guard !ending else { return }
