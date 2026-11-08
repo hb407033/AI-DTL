@@ -56,6 +56,12 @@ final class WorkspaceClient: ObservableObject {
     }
     static let mutedNotice = "iPad 音量是 0，听不到老师说话。按侧面的音量加键调大。"
     private var socket: (any WorkspaceTransport)?
+    private var realtimeActive = false
+    private var conductor: TutorConductor?
+    private var realtimeSession: RealtimeSession?
+    private var outbox: SyncOutbox?
+    private var outboxSeq = 0
+    private var activeHost = ""
     private let transportFactory: (URL) -> any WorkspaceTransport
     private var generation = UUID()
     private var turnId: String?
@@ -94,18 +100,30 @@ final class WorkspaceClient: ObservableObject {
             #endif
             return WorkspaceSocketTransport(url: target)
         }
-        audio.onTurn = { [weak self] pcm in self?.submitPCM(pcm) }
+        audio.onFrame = { [weak self] pcm in
+            guard let self, self.realtimeActive else { return }
+            self.conductor?.childAudio(pcm)
+        }
+        audio.onTurn = { [weak self] pcm in
+            guard let self else { return }
+            if self.realtimeActive { self.conductor?.childFinishedSpeaking(); return }
+            self.submitPCM(pcm)
+        }
         audio.onLevel = { [weak self] rms in
             // 说话时 RMS 约 0.02–0.2；开方拉开低音量区分度。
             let level = min(5, Int((sqrt(rms) * 12).rounded()))
             if self?.micLevel != level { self?.micLevel = level }
         }
         audio.onSpeechStart = { [weak self] in
-            guard let self, self.working || self.thinking else { return }
+            guard let self else { return }
+            if self.realtimeActive { self.conductor?.childStartedSpeaking(); return }
+            guard self.working || self.thinking else { return }
             self.interruptReply(preservingSpeech: true)
         }
         audio.onDrained = { [weak self] in
             guard let self, self.connected else { return }
+            // 直连时“老师在说话”由 conductor 保持，播放结束回调不能立刻把它盖回“在听”。
+            if self.realtimeActive { self.completedTurns += 1; return }
             self.working = false; self.thinking = false; self.completedTurns += 1
             // iPad 音量为 0 时声音照常播完却听不见（2026-11-08 真机：outputVolume=0）；提示留在屏幕上，不被“轮到你了”盖掉。
             if self.audio.outputMuted { self.status = Self.mutedNotice; self.scheduleListening(preservingStatus: true) }
@@ -119,12 +137,138 @@ final class WorkspaceClient: ObservableObject {
               !host.contains("/"), !host.contains("@"), let url = URL(string: "ws://\(host):8791/tutor/workspace?voiceRecovery=1") else {
             status = "请先核对题意和主机地址。"; return
         }
+        activeHost = host
+        if startRealtimeIfEnabled(host: host, microphone: microphone) { return }
         continuous = true; withoutMicrophone = !microphone
         reconnectAttempts = 0
         connectionSettings = (url, conversationMode, record.sessionId, record.problem!)
         discussionRequested = leadDiscussion && conversationMode == "dialogue"
         openConnection()
     }
+    /// 开关默认关。只有家长打开，或这次启动明确带了 `-realtimeMode YES`，并且本机已有密钥，才走直连。
+    private func realtimeRequested() -> Bool {
+        if UserDefaults.standard.bool(forKey: "realtimeMode") { return true }
+        if ProcessInfo.processInfo.environment["AI_DTL_REALTIME_MODE"] == "YES" { return true }
+        let args = ProcessInfo.processInfo.arguments
+        guard let flag = args.firstIndex(of: "-realtimeMode") else { return false }
+        let next = args.index(after: flag)
+        return args.indices.contains(next) && args[next] == "YES"
+    }
+
+    private func startRealtimeIfEnabled(host: String, microphone: Bool) -> Bool {
+        let endpoint: (url: URL, apiKey: String)?
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["AI_DTL_WORKSPACE_TEST_ID"].flatMap(UUID.init(uuidString:)) != nil,
+           let raw = ProcessInfo.processInfo.environment["AI_DTL_REALTIME_FAKE_URL"], let url = URL(string: raw) {
+            endpoint = (url, "synthetic")
+        } else { endpoint = realtimeRequested() ? RealtimeKeyStore.load() : nil }
+        #else
+        endpoint = realtimeRequested() ? RealtimeKeyStore.load() : nil
+        #endif
+        guard let endpoint else { return false }
+        let gates: TeachingGates
+        do { gates = try TeachingGates() }
+        catch { status = "实时对话没准备好，仍用原来的主机对话。"; return false }
+        let session = RealtimeSession(url: endpoint.url, apiKey: endpoint.apiKey)
+        let audioPlayer = audio
+        let slow = SlowPath(gates: gates, requestText: { _, _ in throw RealtimeKeyError.unavailable }, speak: { text in (Data(), text) })
+        let conductor = TutorConductor(session: session, gates: gates, audio: audioPlayer, slowPath: slow, context: { [weak self] in
+            self?.gateContext() ?? GateContext(record: WorkspaceClient.placeholderRecord, turnId: "t", responseId: "r",
+                                               permission: "hint", child: "", history: [], imageAttached: false, ocrNumbers: [])
+        })
+        conductor.onPhase = { [weak self] phase, text, messages in
+            guard let self, self.realtimeActive else { return }
+            self.connected = phase != .off
+            self.listening = phase == .listening
+            self.thinking = phase == .thinking
+            self.working = phase == .speaking
+            self.status = text
+            self.messages = messages
+        }
+        conductor.onTurnRecorded = { [weak self] turn in self?.enqueue(turn) }
+        self.conductor = conductor
+        realtimeSession = session
+        realtimeActive = true
+        continuous = true
+        withoutMicrophone = !microphone
+        connected = true
+        status = "正在连接实时对话…"
+        if outbox == nil { outbox = SyncOutbox(directory: outboxDirectory(), request: postSync) }
+        Task { [weak self] in
+            guard let self else { return }
+            let instructions = gates.realtimeInstructions(self.gateContext())
+            await session.prewarm(instructions: instructions)
+            guard self.realtimeActive else { return }
+            if case .ready = session.state {
+                #if DEBUG
+                if ProcessInfo.processInfo.environment["AI_DTL_REALTIME_AUTOTURN"] == "1" {
+                    self.transcript = "这题我不会，想先问问。"
+                    self.conductor?.childStartedSpeaking()
+                    // 界面测试大约每秒看一次状态，听的阶段要留够时间，后面才切到老师说话。
+                    try? await Task.sleep(for: .milliseconds(4000))
+                    guard self.realtimeActive else { return }
+                    self.conductor?.childAudio(Data(repeating: 1, count: 3200))
+                    self.conductor?.childFinishedSpeaking()
+                    return
+                }
+                #endif
+                self.scheduleListening()
+            } else {
+                self.conductor?.childStartedSpeaking()
+                self.conductor?.childFinishedSpeaking()
+            }
+        }
+        return true
+    }
+
+    private func gateContext() -> GateContext {
+        let current = record?() ?? Self.placeholderRecord
+        return GateContext(record: current, turnId: turnId ?? UUID().uuidString, responseId: responseId ?? UUID().uuidString,
+                           permission: "hint", child: transcript.isEmpty ? "这题我不会，想先问问。" : transcript,
+                           history: [], imageAttached: false, ocrNumbers: [], inkChanged: false, canvasJPEG: nil)
+    }
+
+    func noteSavedRecord(_ saved: WorkspaceRecord) {
+        guard realtimeActive, let outbox else { return }
+        outboxSeq += 1
+        outbox.enqueue(SyncBatch(batchId: "save-\(outboxSeq)", sessionId: saved.sessionId, seq: outboxSeq, expectedRevision: saved.revision,
+                                 record: saved, decisions: [], turns: [], usage: []))
+    }
+
+    private func enqueue(_ turn: TurnRecord) {
+        guard let outbox, let saved = record?() else { return }
+        outboxSeq += 1
+        outbox.enqueue(SyncBatch(batchId: "turn-\(outboxSeq)", sessionId: saved.sessionId, seq: outboxSeq, expectedRevision: saved.revision,
+                                 record: saved, decisions: [],
+                                 turns: [SyncTurn(turnId: turn.turnId, transcript: transcript, kind: turn.kind, utterance: turn.utterance,
+                                                  played: turn.played, path: turn.path, gateReason: turn.gateReason, latencyMs: turn.latencyMs)],
+                                 usage: []))
+    }
+
+    private func outboxDirectory() -> URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        #if DEBUG
+        if let id = ProcessInfo.processInfo.environment["AI_DTL_WORKSPACE_TEST_ID"], UUID(uuidString: id) != nil {
+            return base.appendingPathComponent("ai-dtl/workspace-validation/\(id)/realtime-outbox", isDirectory: true)
+        }
+        #endif
+        return base.appendingPathComponent("ai-dtl/realtime-outbox", isDirectory: true)
+    }
+
+    private func postSync(host: String, path: String, body: Data) async throws -> (Int, Data) {
+        guard let url = URL(string: "http://\(host):8791\(path)") else { throw WorkspaceError.invalidHost }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return ((response as? HTTPURLResponse)?.statusCode ?? 0, data)
+    }
+
+    private static let placeholderRecord = WorkspaceRecord(schemaVersion: 2, sessionId: "local-placeholder", eventId: "local-placeholder",
+        revision: 0, problem: nil, phase: "paused", childInkBase64: "", board: LearningBoard(revision: 0, rectangles: []),
+        submissions: [], feedback: [], openQuestions: [])
+
     private func openConnection() {
         guard let settings = connectionSettings, continuous else { return }
         let id = generation, task = transportFactory(settings.url)
@@ -218,6 +362,7 @@ final class WorkspaceClient: ObservableObject {
         status = "正在记录你对上次反馈的异议；不会打开麦克风。"
     }
     func interruptReply(preservingSpeech: Bool = false) {
+        if realtimeActive { conductor?.interrupt(); return }
         guard connected, !ending, !interruptingReply, (working || thinking),
               let turnId, let current = record?() else { return }
         rearm?.cancel(); audio.stopPlayback()
@@ -476,6 +621,14 @@ final class WorkspaceClient: ObservableObject {
     }
     func finishSession(save: () async -> Void) async {
         guard !ending else { return }
+        if realtimeActive {
+            ending = true
+            conductor?.interrupt()
+            await save()
+            if let outbox { await outbox.flush(host: activeHost) }
+            pause()
+            return
+        }
         ending = true; continuous = false; operation = UUID(); thinking = false; rearm?.cancel(); audio.stop(); listening = false
         let id = generation
         if connected, working, turnSubmitted, let turnId, let record = record?() {
@@ -502,6 +655,7 @@ final class WorkspaceClient: ObservableObject {
         generation = UUID(); operation = UUID(); turnSubmitted = false
         rearm?.cancel(); reconnectTask?.cancel(); audio.stop()
         socket?.close(); socket = nil
+        realtimeSession?.close(); realtimeSession = nil; conductor = nil; realtimeActive = false
         connected = false; listening = false; working = false; thinking = false; continuous = false
         turnId = nil; responseId = nil; awaitingAuthorization = false
         correctionOnly = nil; ending = false; interruptionAcknowledged = false

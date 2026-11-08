@@ -16,17 +16,21 @@ ssh "$MINI" "cat > \"\$HOME/$DIR/child-audio/$CASE-photo.jpg\"" < "$PHOTO"
 for i in $(seq 1 90); do curl -sf -m 2 http://hb-mini.local:8797/healthz >/dev/null && break; sleep 1; done
 curl -sf -m 5 http://hb-mini.local:8797/healthz >/dev/null || { echo "mini 验收宿主未就绪"; exit 1; }
 ENV=$(python3 -I -c "
-import json,base64,sys,uuid
-print(json.dumps({'AI_DTL_WORKSPACE_TEST_ID': str(uuid.uuid4()).upper(), 'AI_DTL_WORKSPACE_HOST': 'hb-mini.local',
+import json,os,sys,uuid
+env={'AI_DTL_WORKSPACE_TEST_ID': str(uuid.uuid4()).upper(), 'AI_DTL_WORKSPACE_HOST': 'hb-mini.local',
   'AI_DTL_WORKSPACE_HTTP_PORT': '8797', 'AI_DTL_WORKSPACE_AUDIO_URL': 'http://hb-mini.local:8797/harness/audio',
   'AI_DTL_ADAPTIVE_PHOTO_CASE': sys.argv[2], 'AI_DTL_AUTOSTART': '1', 'AI_DTL_AUTOSTART_CANDIDATE': sys.argv[3],
-  'AI_DTL_WORKSPACE_PHOTO_URL': 'http://hb-mini.local:8797/harness/photo/' + sys.argv[2]}))" "$PHOTO" "$CASE" "$CANDIDATE")
+  'AI_DTL_WORKSPACE_PHOTO_URL': 'http://hb-mini.local:8797/harness/photo/' + sys.argv[2]}
+if os.environ.get('AI_DTL_REALTIME_MODE') == 'YES': env['AI_DTL_REALTIME_MODE'] = 'YES'
+print(json.dumps(env))" "$PHOTO" "$CASE" "$CANDIDATE")
+REALTIME_ARG=""
+if [ "${AI_DTL_REALTIME_MODE:-}" = "YES" ]; then REALTIME_ARG="-realtimeMode YES"; fi
 if [ -n "${CONSOLE_LOG:-}" ]; then
   # 附着控制台，收集 App 的 NSLog（如 AIDTL-AUDIO 播放诊断）；进程结束时自动退出。
-  nohup xcrun devicectl device process launch --device "$DEVICE" --terminate-existing --console --environment-variables "$ENV" com.houbin.aischolar.pad > "$CONSOLE_LOG" 2>&1 &
+  nohup xcrun devicectl device process launch --device "$DEVICE" --terminate-existing --console --environment-variables "$ENV" com.houbin.aischolar.pad $REALTIME_ARG > "$CONSOLE_LOG" 2>&1 &
   sleep 5
 else
-  xcrun devicectl device process launch --device "$DEVICE" --terminate-existing --environment-variables "$ENV" com.houbin.aischolar.pad
+  xcrun devicectl device process launch --device "$DEVICE" --terminate-existing --environment-variables "$ENV" com.houbin.aischolar.pad $REALTIME_ARG
 fi
 echo "验收目录（mini）：~/$DIR"
 echo "$DIR" > /tmp/ai-dtl-device-run-dir

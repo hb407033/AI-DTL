@@ -202,7 +202,9 @@ struct LearningWorkspaceView: View {
         }) {
             WorkspaceParentSettingsView(host: $model.host, currentUnit: $model.currentUnit,
                 discovery: discovery, selectedHostId: $selectedHostId, chooseHost: { chooseHost($0) },
-                connected: voice.connected, busy: model.busy)
+                connected: voice.connected, busy: model.busy, claimRealtime: { code in
+                    try await RealtimeKeyStore.fetch(host: model.host, code: code)
+                })
         }
         .sheet(isPresented: $showPhotoSheet) {
             if let photo = model.photo {
@@ -277,6 +279,7 @@ struct LearningWorkspaceView: View {
             if !simulatedInput { discovery.start() }
             restoreHostIdentity()
             voice.record = { model.record }
+            model.onRecordSaved = { saved in voice.noteSavedRecord(saved) }
             scaffold.record = { model.record }
             model.teacherHint = { scaffold.evidenceSummary }
             voice.acceptRecord = { try model.acceptServerRecord($0) }

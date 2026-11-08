@@ -187,6 +187,8 @@ final class ProblemCaptureModel: ObservableObject {
         if self.photo === photo { photoFocus = (photo, statement, focus) }
         return focus
     }
+    /// 保存成功后通知实时同步队列。没接上队列时什么都不做。
+    var onRecordSaved: ((WorkspaceRecord) -> Void)?
     func saveToHost() async {
         if let savingTask { await savingTask.value; return }
         guard !busy, record?.problem?.statement.confirmed == true else { return }
@@ -251,6 +253,7 @@ final class ProblemCaptureModel: ObservableObject {
                 let caughtUp = drawing.dataRepresentation() == ink && latestBoard.rectangles == snapshot.board.rectangles
                 status = caughtUp ? "已保存到学习主机。" : "本机有新笔迹，等待再次同步。"
                 persist()
+                if let saved = record { onRecordSaved?(saved) }
                 if caughtUp || ContinuousClock.now >= deadline { return }
             } catch WorkspaceError.server(409, _) {
                 do { conflictRecord = try await fetch(snapshot.sessionId, host).validated() }

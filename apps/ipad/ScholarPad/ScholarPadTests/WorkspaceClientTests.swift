@@ -2,7 +2,7 @@ import XCTest
 @testable import ScholarPad
 
 @MainActor
-private final class WorkspaceTestTransport: WorkspaceTransport {
+final class WorkspaceTestTransport: WorkspaceTransport {
     var sent: [[String: Any]] = []
     var frames = 0
     var failFrame: Int?

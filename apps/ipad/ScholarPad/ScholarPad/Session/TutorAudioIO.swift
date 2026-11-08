@@ -9,6 +9,8 @@ final class TutorAudioIO {
     private(set) var capturedPCMBytes = 0
     private(set) var peakInputRMS = 0.0
     var onTurn: ((Data) -> Void)?
+    /// 每个 16k Int16 帧。只在内存里交给实时会话，不落盘。
+    var onFrame: ((Data) -> Void)?
     var onSpeechStart: (() -> Void)?
     var onDrained: (() -> Void)?
     var onError: ((String) -> Void)?
@@ -115,6 +117,7 @@ final class TutorAudioIO {
                         self.peakInputRMS = max(self.peakInputRMS, rms)
                         self.onLevel?(rms)
                     }
+                    if self.prompting == 0 { self.onFrame?(data) }
                     if self.prompting > 0 { return }
                     let pcm = self.detector.append(data)
                     if !self.speechStarted && self.detector.hearingSpeech {
