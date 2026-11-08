@@ -19,7 +19,7 @@
 | 11 离线 outbox | 完成 | 按会话再按文件名。409 停该会话并留文件。 |
 | 12 口令与开关 | 完成（未实发） | 路由有并发、过期、限流测试。没有运行发放脚本，没有展示口令。 |
 | 13 界面分流 | 完成 | 模拟器 UI 测试看到「正在听你说」再看到「老师在说话」。 |
-| 14 真机门槛 | 阻断 | 假服务和模拟器不能证明四项门槛、默认开启或 Release 安装。没有已连接的授权 iPad。 |
+| 14 真机门槛 | 阻断 | Debug 已装到珩pad（`00008112-000509D9268A201E`）。5 类题和四项门槛仍要 mini 8797，这次不能 SSH。没有装 Release，默认开关仍关。 |
 
 ## 和计划不一致、已按源码改过的地方
 
@@ -93,7 +93,7 @@ iPad 界面：
 ## 没有做、也不能用这次结果代替的事
 
 - mini 探针、mini 上的服务、SSH、部署。待授权。
-- 真机安装和 5 类题回归。当时没有已连接、已授权的 iPad（只看到一台 iPhone）。`tools/device-realtime-case.sh` 和 `tools/device-teaching-case.sh` 没有运行。
+- 5 类题回归和四项真机门槛。2026-11-08 稍后已经把 Debug 装到已解锁的珩pad，见 `docs/handoffs/2026-11-08-ipad-device-check.md`。`tools/device-realtime-case.sh` 和 `tools/device-teaching-case.sh` 仍会 SSH mini，这次没有运行。
 - 四项真机门槛（中位数 ≤ 4 秒、抢答/口诀 ≤ v16、慢路径 ≤ 30%、token ≤ v16 的一半）没有测量。`realtimeMode` 默认仍是关。没有装 Release。没有家长开麦确认。
 - `tools/allow-ipad-key-handout.sh` 没有运行，没有领取，没有展示 6 位口令。
 - 本机 8791 上已有的学习宿主没有被当作验收对象，也没有停掉。
