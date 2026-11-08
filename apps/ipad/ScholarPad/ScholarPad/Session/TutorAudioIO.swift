@@ -43,10 +43,25 @@ final class TutorAudioIO {
               engine?.mainMixerNode.outputVolume ?? -1, scheduledFrames, playedFrames, recording ? "y" : "n")
         #endif
     }
+    /// 开启回声消除后 iOS 会重新配置音频并停掉引擎（2026-11-08 真机：engine=stop 后老师的声音一帧没播出）；
+    /// 停了就重新启动，并接着播还没播完的缓冲。
+    @discardableResult private func restartIfStopped(_ reason: String) -> Bool {
+        guard let engine else { return false }
+        if engine.isRunning { return true }
+        do {
+            try engine.start()
+            if queued > 0 || prompting > 0 { player?.play() }
+            trace("restarted:\(reason)")
+            return true
+        } catch {
+            trace("restartFailed:\(reason)")
+            return false
+        }
+    }
     private func observe(_ engine: AVAudioEngine) {
         if let configObserver { NotificationCenter.default.removeObserver(configObserver) }
         configObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.trace("configChange") }
+            MainActor.assumeIsolated { self?.trace("configChange"); self?.restartIfStopped("configChange") }
         }
     }
 
@@ -108,7 +123,7 @@ final class TutorAudioIO {
                     if let pcm { self.speechStarted = false; self.onTurn?(pcm) }
                 }
             }
-            self.engine = engine; observe(engine); try engine.start(); recording = true; trace("listen")
+            self.engine = engine; observe(engine); try engine.start(); recording = true; trace("listen"); restartIfStopped("listen")
         } catch { stop(); onError?("麦克风启动失败，原稿仍保留。"); }
     }
     func beginResponse() { stopPlayback(); accepting = true }
@@ -145,7 +160,7 @@ final class TutorAudioIO {
             engine.attach(node); engine.connect(node, to: engine.mainMixerNode, format: format)
             try engine.start(); self.engine = engine; player = node; observe(engine); trace("playbackEngine")
         }
-        guard let player else { throw WorkspaceError.unavailable }
+        guard let player, restartIfStopped("play") else { throw WorkspaceError.unavailable }
         return player
     }
 
