@@ -180,3 +180,41 @@ final class PhotoFocusTests: XCTestCase {
         XCTAssertGreaterThan(plain.size.height, 180 + 700 * photo.size.height / photo.size.width)
     }
 }
+
+final class OriginalPhotoSizeTests: XCTestCase {
+    /// 模拟暗光下噪点很多的 12MP 整页照片：原像素在任何质量下都超过 2MB。
+    private func noisyFullResolution() -> UIImage {
+        let size = CGSize(width: 3024, height: 4032)
+        let format = UIGraphicsImageRendererFormat(); format.scale = 1; format.opaque = true
+        var rng = SystemRandomNumberGenerator()
+        return UIGraphicsImageRenderer(size: size, format: format).image { ctx in
+            UIColor(white: 0.9, alpha: 1).setFill(); ctx.fill(CGRect(origin: .zero, size: size))
+            for line in 0..<12 {
+                ("③ 12.5 ÷ 0.5 = 204    先估：商比被除数（大/小）" as NSString).draw(at: CGPoint(x: 120, y: 200 + line * 300),
+                    withAttributes: [.font: UIFont.boldSystemFont(ofSize: 110), .foregroundColor: UIColor.black])
+            }
+            for _ in 0..<1_200_000 {
+                UIColor(white: CGFloat(Int.random(in: 100...255, using: &rng)) / 255, alpha: 0.35).setFill()
+                ctx.fill(CGRect(x: Int.random(in: 0..<3024, using: &rng), y: Int.random(in: 0..<4032, using: &rng), width: 2, height: 2))
+            }
+        }
+    }
+    func testNoisyNightPhotoIsStillSavedWithinTwoMegabytes() throws {
+        let photo = noisyFullResolution()
+        XCTAssertGreaterThan(try XCTUnwrap(photo.jpegData(compressionQuality: 0.55)).count, 2 * 1024 * 1024, "夹具应复现原像素存不下的情况")
+        let data = try XCTUnwrap(TutorSnapshot.originalPhoto(photo), "噪点多的照片也要能保存")
+        XCTAssertLessThanOrEqual(data.count, 2 * 1024 * 1024)
+        let saved = try XCTUnwrap(UIImage(data: data))
+        XCTAssertGreaterThanOrEqual(max(saved.size.width, saved.size.height), 1600, "缩小后长边仍要够看清题目文字")
+    }
+    func testCleanPhotoKeepsOriginalPixels() throws {
+        let size = CGSize(width: 3024, height: 4032)
+        let format = UIGraphicsImageRendererFormat(); format.scale = 1; format.opaque = true
+        let clean = UIGraphicsImageRenderer(size: size, format: format).image { ctx in
+            UIColor.white.setFill(); ctx.fill(CGRect(origin: .zero, size: size))
+            ("12.5 ÷ 0.5 =" as NSString).draw(at: CGPoint(x: 200, y: 400), withAttributes: [.font: UIFont.boldSystemFont(ofSize: 120)])
+        }
+        let saved = try XCTUnwrap(UIImage(data: try XCTUnwrap(TutorSnapshot.originalPhoto(clean))))
+        XCTAssertEqual(saved.size, size, "白天的清楚照片不需要缩小")
+    }
+}

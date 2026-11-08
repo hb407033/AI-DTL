@@ -3,20 +3,36 @@ import PencilKit
 
 /// 为 256 KiB 云端消息上限保留 Base64 和 JSON 开销；不改变本地 PencilKit 原稿。
 enum TutorSnapshot {
-    /// 本地原照保留像素尺寸、正规化方向并去除元数据；不复用模型缩略图。
+    /// 本地原照：正规化方向并去除元数据，存成 ≤2MB 的 JPEG；不复用模型缩略图。
+    /// 先只降质量保留原像素；夜里灯光暗、照片噪点多时 12MP 原图降到最低质量仍超 2MB
+    /// （2026-10-25 真机连续“照片没有保存成功”），再逐级缩小长边，题目文字仍清楚。
     static func originalPhoto(_ image: UIImage) -> Data? {
         guard image.size.width > 0, image.size.height > 0 else { return nil }
-        let size = CGSize(width: image.size.width * image.scale, height: image.size.height * image.scale)
-        let format = UIGraphicsImageRendererFormat(); format.scale = 1; format.opaque = true
-        let normalized = UIGraphicsImageRenderer(size: size, format: format).image { context in
-            UIColor.white.setFill(); context.fill(CGRect(origin: .zero, size: size))
-            image.draw(in: CGRect(origin: .zero, size: size))
-        }
-        for quality in [0.95, 0.85, 0.7, 0.55] {
-            if let data = normalized.jpegData(compressionQuality: quality), data.count <= 2 * 1024 * 1024 { return data }
+        let pixel = CGSize(width: image.size.width * image.scale, height: image.size.height * image.scale)
+        var rendered: [CGFloat: UIImage] = [:]
+        for step in originalPhotoSteps {
+            let scale = step.maxEdge.map { min(1, $0 / max(pixel.width, pixel.height)) } ?? 1
+            let key = (scale * 10_000).rounded()
+            let normalized = rendered[key] ?? {
+                let size = CGSize(width: (pixel.width * scale).rounded(), height: (pixel.height * scale).rounded())
+                let format = UIGraphicsImageRendererFormat(); format.scale = 1; format.opaque = true
+                return UIGraphicsImageRenderer(size: size, format: format).image { context in
+                    UIColor.white.setFill(); context.fill(CGRect(origin: .zero, size: size))
+                    image.draw(in: CGRect(origin: .zero, size: size))
+                }
+            }()
+            rendered[key] = normalized
+            if let data = normalized.jpegData(compressionQuality: step.quality), data.count <= 2 * 1024 * 1024 { return data }
         }
         return nil
     }
+
+    /// 依次尝试的（长边上限，JPEG 质量）；maxEdge 为 nil 表示保留原像素。第一个 ≤2MB 的就用。
+    static let originalPhotoSteps: [(maxEdge: CGFloat?, quality: CGFloat)] = [
+        // 白天清楚的照片在原像素就能存下；暗光噪点多时先缩小长边（比降质量有效），质量不低于 0.6，免得手写数字糊边。
+        (nil, 0.95), (nil, 0.85), (nil, 0.7),
+        (3000, 0.75), (2400, 0.75), (2000, 0.7), (1600, 0.65),
+    ]
     static func workspaceImage(drawing: PKDrawing, statement: String, board: FractionBoard? = nil, sourcePhoto: UIImage? = nil, photoFocus: PhotoFocus.Focus? = nil, teacherHint: String? = nil) -> UIImage {
         let rectangles = (board?.rectangles ?? []).filter { $0.owner == .child && FractionBoardRules.validate($0) == nil }
         // 没有笔迹时只留一小块空白，不再用 600 高的白纸挤占整页照片和放大区。
