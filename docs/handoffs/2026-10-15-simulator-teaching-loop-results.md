@@ -464,3 +464,25 @@ tools/sim-child-turn.sh "$DIR/acceptance" plant 0 "六十除以五等于十二�
 - 修复（用户确认后）：`.env.ai.local` 复制到 `~/Library/Application Support/ai-dtl/`（600）；开机配置改为用 nvm 固定的 node v22.22.3 直接运行 Application Support 里的 v14 包，工作目录也在 Application Support，不再依赖 `~/Documents` 和 Homebrew。仓库模板 `deploy/macos/com.houbin.ai-dtl.learning-tutor.plist` 同步。
 - 验证：`kill -9` 后 launchd 2 秒内自动拉起，healthz 正常、主机 ID 不变；家庭作品 30 个文件前后一致；旧配置和 7.7MB 失败日志在 `/tmp/ai-dtl-launchd.Qr8ccp/`。
 - 以后换版本：改开机配置第三个参数的包路径，然后 `launchctl bootout` + `bootstrap`。
+
+**照片没有保存成功（2026-10-25 晚）**：`TutorSnapshot.originalPhoto` 只降 JPEG 质量、不缩像素，12MP 原图在暗光噪点多时降到 0.55 仍超 2MB（模拟噪点照片 0.55 质量约 4.6MB），每次重拍都被拒。改为按 `originalPhotoSteps` 依次尝试：原像素 0.95/0.85/0.7，再长边 3000/2400/2000/1600（质量 0.75→0.65），取第一个 ≤2MB 的。新增两个测试：噪点照片能存下且长边 ≥1600；白天清楚照片保留原像素。iPad 单测 217 项（5 项跳过）全过，Release 重签装机，App 启动后已连上 mini。
+
+## 第十六批：老师不出声、不继续（2026-11-08）
+
+接手时发现 11/1 另一轮会话已把 mini 切到 `2026-11-01-voice-recovery/learning-tutor-voice-recovery-v2.mjs`，并覆盖安装了 iPad（语音恢复、插话、播报时保持收音；见 `2026-11-01-voice-continuity-results.md`）。它的最终客户端当时没完成真机回归。
+
+**现象**：甲乙两数题（"把甲数的小数点向右移动一位……"），开场只有一句"你觉得先算哪一小份最容易？"；后面孩子说话，老师没声音、不继续。
+
+**原因与修复**
+- 开场被删光：`roteStep` 把老师复述题干里的"小数点移动"当成口诀，最后一次删掉整句，只剩兜底句。改为题干里本来就有的词复述不算口诀；`openingPrescribesStructure` 同样不再拦题干里出现过的词（题干没有的"线段图"等照旧拦）。
+- 转写连接失败：宿主日志 10 次 `workspaceProviderFailure`，全是 `connectionClosed`、`events: []`；当时实测云端正常（1/3 个并发连接都在约 2 秒内收到 `session.created`），属于家里网络短暂中断。ws 断网时先报 `error` 再报 `close`，原代码把网络错误也记成了"云端关闭"。现在：转写间隔 0.4 秒、1.2 秒最多再试两次（教学仍只在握手阶段重连）；`close` 不再覆盖已记下的失败；失败日志带时间和真实网络错误码（ENOTFOUND、ECONNRESET、http 状态码）。
+- 没听清只显示文字：iPad 本机用语音合成说"刚才没听清，你再说一遍好吗？"（老师回复失败时说"老师刚才没想好，你再说一遍好吗？"）；走收音引擎的同一播放节点（有回声消除），播放期间麦克风声音不进端点检测，播完重置输入；不算老师回复，不触发 onDrained。`WorkspaceClient.speakPrompt` 可在测试中替换。
+- 测试：宿主 558/558，iPad 单测 226 项（5 项跳过）；新增测试均确认去掉修复时失败。
+
+**真机测试脚本**：`tools/device-teaching-run.sh` 改用 nvm 的 node 22（Homebrew 的 node 已坏），宿主就绪改为最多轮询 90 秒（tsx 首次编译要二十多秒）；新增 `tools/device-teaching-case.sh <题图> <case> <台词文件>` 一条命令跑一道题并收尾。
+
+**真机全流程**（Debug 版 + mini 隔离验收服务，甲乙两数题，5 句合成孩子语音）：6/6、0 作废；开场复述题意并提问，孩子算出 0.7、7、相差 6.3，检验后交还。这是 11/1 语音客户端第一次真机跑通。"没听清"本机播报只在单测中覆盖，真机上没有人为制造断网来验证听感。
+
+**部署（用户确认后）**：mini 开机配置切到 `runtime/2026-11-08-teaching-v15/learning-tutor-teaching-v15.mjs`（SHA256 前缀 `a5036835f324`，40 个源文件一致，不含配置和凭据），launchd 管理；家庭作品 72 个文件前后一致；备份 `/tmp/ai-dtl-teaching-v15.99wbMn`，voice-recovery-v2 保留可回退。iPad 装 Release 版，新描述文件到期 **2026-11-15**（旧描述文件到期前 Xcode 会沿用，需先移走本机缓存的那份才会换新）。
+
+**改用公司团队签名（2026-11-08，用户确认公司允许）**：免费个人团队描述文件只有 7 天。改用公司团队 `W4B64PJH42` 现成的通配开发描述文件（`iOS Team Provisioning Profile: *`，已含这台 iPad，到期 2027-10-07）。Xcode 不允许手动签名模式使用它管理的描述文件，所以先 `CODE_SIGNING_ALLOWED=NO` 构建，再用 `codesign` 嵌入描述文件、写明 entitlements 签名；不在公司账号里注册 App ID、设备或证书。换团队不能覆盖安装：先用 `devicectl device copy from` 备份 App 数据容器（`acceptance/ipad-app-backup-20261108-000238`，106 个有效文件），卸载重装后把 `workspace-camera-v2/current.json` 和偏好设置放回，字节一致；作品在 mini 上不受影响。这台 iPad 早已信任公司证书，装后直接能开，已连上 mini v15。以后更新用 `tools/install-ipad-company-signed.sh`（同团队覆盖安装，数据保留）。

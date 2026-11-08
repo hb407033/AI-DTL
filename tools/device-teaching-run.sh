@@ -9,10 +9,11 @@ PHOTO="$1"; CASE="$2"; CANDIDATE="${3:-0}"
 DEVICE=00008112-000509D9268A201E
 MINI=hb-mini@10.10.10.6
 DIR="Library/Application Support/ai-dtl/acceptance/device-$(date +%Y%m%d-%H%M%S)"
-ssh "$MINI" "cd ~/Documents/Codex/2026-08-29/wo-yo && pkill -f serve-sim-debug-host.ts; mkdir -p \"\$HOME/$DIR\" && nohup /opt/homebrew/bin/node --env-file-if-exists=.env.ai.local --import tsx apps/agent-host/scripts/serve-sim-debug-host.ts \"\$HOME/$DIR\" 8797 8798 0.0.0.0 > /tmp/ai-dtl-device-run.log 2>&1 &"
+ssh "$MINI" "cd ~/Documents/Codex/2026-08-29/wo-yo && pkill -f serve-sim-debug-host.ts; mkdir -p \"\$HOME/$DIR\" && nohup \$HOME/.nvm/versions/node/v22.22.3/bin/node --env-file-if-exists=.env.ai.local --import tsx apps/agent-host/scripts/serve-sim-debug-host.ts \"\$HOME/$DIR\" 8797 8798 0.0.0.0 > /tmp/ai-dtl-device-run.log 2>&1 &"
 ssh "$MINI" "mkdir -p \"\$HOME/$DIR/child-audio\""
 ssh "$MINI" "cat > \"\$HOME/$DIR/child-audio/$CASE-photo.jpg\"" < "$PHOTO"
-sleep 8
+# tsx 现编译启动有时要十几秒，轮询而不是固定等待。
+for i in $(seq 1 90); do curl -sf -m 2 http://hb-mini.local:8797/healthz >/dev/null && break; sleep 1; done
 curl -sf -m 5 http://hb-mini.local:8797/healthz >/dev/null || { echo "mini 验收宿主未就绪"; exit 1; }
 ENV=$(python3 -I -c "
 import json,base64,sys,uuid
