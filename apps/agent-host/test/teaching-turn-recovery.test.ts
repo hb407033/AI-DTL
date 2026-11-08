@@ -586,6 +586,20 @@ test("删问句的编辑越界时，宿主在原稿上只删问句，照常回�
   await expect(provider(request).decide(help)).resolves.toMatchObject({ utterance: "你猜得挺准。0.4千克就是十分之四，3.6元分成十份，一份是几元？" });
 });
 
+// 2026-11-08 真机：题目就是“把甲数的小数点向右移动一位”，开场复述题意被当成口诀删光，只剩兜底的一句。
+test("题目本身讲小数点移动时，老师复述题意不算口诀步骤", async () => {
+  const opening = { ...input, child: "", turnId: "open", record: { ...input.record, problem: { ...input.record.problem!,
+    statement: { text: "甲、乙两数的和是7.7，如果把甲数的小数点向右移动一位，那么甲数就和乙数相等。甲、乙两数相差（ ）。", revision: 0, confirmed: true } } } } as TeachingInput;
+  const restate = { ...draft, evidenceIds: ["problem"], utterance: "题目说甲数小数点向右移动一位就和乙数相等。你先说说，从这句话看，甲和乙谁大？" };
+  const request = vi.fn().mockResolvedValueOnce(JSON.stringify(restate)).mockResolvedValue(allowed);
+  await expect(provider(request).decide(opening)).resolves.toMatchObject({ utterance: restate.utterance });
+  // 题干没有的方法词仍要拦：“用线段图表示”。
+  const prescribing = { ...restate, utterance: "题目说甲数小数点右移一位等于乙数。你可以试着用线段图表示一下？" };
+  const req2 = vi.fn().mockResolvedValueOnce(JSON.stringify(prescribing)).mockResolvedValueOnce(JSON.stringify(restate)).mockResolvedValue(allowed);
+  await expect(provider(req2).decide(opening)).resolves.toMatchObject({ utterance: restate.utterance });
+  expect(req2.mock.calls[1]![1]).toContain("首次开场不要替孩子点出解题结构");
+});
+
 test("小数除法核对时，孩子还没说出两边同时乘，老师不能先说出方法；孩子说过之后可以接着用", async () => {
   const division = { ...input, record: { ...input.record, problem: { ...input.record.problem!,
     statement: { text: "12.5÷0.5", revision: 0, confirmed: true } } }, child: "我觉得大概二十几，卷子上写的是二百零四。" } as TeachingInput;

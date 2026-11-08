@@ -181,8 +181,11 @@ export function validateTeachingDecision(raw: unknown, input: TeachingInput,
   if (!input.child.trim() && !input.history.length && !input.record.submissions.length
     && !/[？?]|先说说|先想想|你想怎么|你准备|你打算/u.test(plan.utterance)) throw Error("openingNeedsChildIdea");
   // 首次开场不替孩子点出解题结构（如“间隔和棵数的关系”“看看有什么规律”“画线段标出间隔”）；泛泛邀请画画或说说不拦。
-  const prescribes = (text: string) => /线段|标出|间隔(?:和|与|数)|棵数|规律|关系|公式|列式|底乘|乘高|(?:变|化)成整数|乘(?:以)?(?:十|10)|扩大|小数点|竖式|倒数/u.test(text)
-    || openingIntroducesNumbers(text, input.record.problem?.statement.text ?? "");
+  // 题干里本来就有的词（如题目讲“小数点向右移动”）复述出来不算替孩子点结构。
+  const statementText = input.record.problem?.statement.text ?? "";
+  const prescribes = (text: string) => [...text.matchAll(/线段|标出|间隔(?:和|与|数)|棵数|规律|关系|公式|列式|底乘|乘高|(?:变|化)成整数|乘(?:以)?(?:十|10)|扩大|小数点|竖式|倒数/gu)]
+      .some(m => !statementText.includes(m[0]))
+    || openingIntroducesNumbers(text, statementText);
   if (!input.child.trim() && !input.history.length && !input.record.submissions.length && prescribes(plan.utterance)) {
     if (!checks.softGates) throw Error("openingPrescribesStructure");
     // 最后一次仍点出方法时，删掉点方法的那句，留下核对或邀请（2026-10-16 真机：“你写的是209吗？试着把被除数和除数同时扩大10倍……”）。
@@ -339,7 +342,10 @@ export function validateTeachingDecision(raw: unknown, input: TeachingInput,
   // 不给口诀式步骤（2026-10-16 真机小数乘法求助：“试着把3.6的小数点向左移一位，再乘4看看？”）。
   // 求助时也要给能看能数的小一步，让孩子自己发现规律；孩子自己说到小数点怎么动时可以接着用。
   const rote = /小数点[^。！？?]{0,8}(?:移|挪|向[左右]|往[左右])|移动?小数点|去掉小数点|(?:末尾|后面)(?:添|补|加)上?(?:一个)?(?:0|零)|先不(?:看|管)小数点|当(?:成|作)整数(?:来)?(?:乘|算)/u;
-  if (rote.test(plan.utterance) && ![input.child, ...input.history.map(h => h.child)].some(said => /小数点/u.test(said))) {
+  // 题目本身就在说小数点移动（2026-11-08 真机：“把甲数的小数点向右移动一位……”）时，复述题意不是口诀，
+  // 原先把整句开场删光，只剩一句没头没尾的“你觉得先算哪一小份最容易？”。
+  const statementMovesPoint = /小数点/u.test(input.record.problem?.statement.text ?? "");
+  if (rote.test(plan.utterance) && !statementMovesPoint && ![input.child, ...input.history.map(h => h.child)].some(said => /小数点/u.test(said))) {
     if (!checks.softGates) throw Error("roteStep");
     const kept = (plan.utterance.match(/[^。！？?!]+[。！？?!]?/gu) ?? []).filter(part => !rote.test(part)).join("").trim();
     plan.utterance = /[？?]/u.test(kept) ? kept : `${kept}${kept && !/[。！!]$/u.test(kept) ? "。" : ""}你觉得先算哪一小份最容易？`;
