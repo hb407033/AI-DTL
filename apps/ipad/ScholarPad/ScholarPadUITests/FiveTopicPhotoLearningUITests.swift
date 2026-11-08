@@ -70,7 +70,7 @@ final class FiveTopicPhotoLearningUITests: XCTestCase {
         XCTAssertEqual(voice.label, "结束对话", app.staticTexts["workspaceVoiceStatus"].label)
         let replay = app.buttons["workspaceSyntheticVoice"]
         if !replay.isHittable {
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.9)).press(forDuration: 0.1,
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.95)).press(forDuration: 0.1,
                 thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.4)))
         }
         XCTAssertTrue(replay.isHittable, app.debugDescription); replay.tap()
@@ -103,7 +103,7 @@ final class FiveTopicPhotoLearningUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["workspaceRestoredFeedback"].exists)
         voice.tap(); waitForVoice("结束对话")
         if !replay.isHittable {
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.9)).press(forDuration: 0.1,
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.95)).press(forDuration: 0.1,
                 thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.4)))
         }
         replay.tap()

@@ -43,24 +43,28 @@ struct VoiceStateBar: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon).font(.system(size: 15, weight: .semibold))
-            Text(title).font(.subheadline.weight(.semibold)).accessibilityIdentifier("workspaceVoicePhase")
-            if phase == .listening { LevelBars(level: micLevel, tint: tint) }
-            if phase == .thinking {
-                HStack { ProgressView().controlSize(.small).tint(tint) }
-                    .accessibilityElement(children: .contain).accessibilityIdentifier("workspaceThinkingIndicator")
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: icon).font(.system(size: 15, weight: .semibold))
+                Text(title).font(.subheadline.weight(.semibold)).accessibilityIdentifier("workspaceVoicePhase")
+                if phase == .listening { LevelBars(level: micLevel, tint: tint) }
+                if phase == .thinking {
+                    HStack { ProgressView().controlSize(.small).tint(tint) }
+                        .accessibilityElement(children: .contain).accessibilityIdentifier("workspaceThinkingIndicator")
+                }
+                if phase == .speaking { Image(systemName: "waveform").symbolEffect(.variableColor.iterative) }
+                Spacer(minLength: 0)
             }
-            if phase == .speaking { Image(systemName: "waveform").symbolEffect(.variableColor.iterative) }
-            Text(detail).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+            .foregroundStyle(tint)
+            .padding(.horizontal, 10).frame(height: 32)
+            .background(tint.opacity(phase == .off ? 0.08 : 0.14), in: Capsule())
+            .overlay(Capsule().stroke(tint.opacity(phase == .off ? 0 : 0.5), lineWidth: 1))
+            .animation(.easeOut(duration: 0.2), value: phase)
+            // 说明另起一行、最多两行、固定高度：窄侧栏也能看全（如音量为 0 的提醒），操作区不随字数跳动。
+            Text(detail).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+                .frame(maxWidth: .infinity, minHeight: 34, maxHeight: 34, alignment: .topLeading)
                 .accessibilityIdentifier("workspaceVoiceStatus")
-            Spacer(minLength: 0)
         }
-        .foregroundStyle(tint)
-        .padding(.horizontal, 10).frame(height: 32)
-        .background(tint.opacity(phase == .off ? 0.08 : 0.14), in: Capsule())
-        .overlay(Capsule().stroke(tint.opacity(phase == .off ? 0 : 0.5), lineWidth: 1))
-        .animation(.easeOut(duration: 0.2), value: phase)
     }
 }
 

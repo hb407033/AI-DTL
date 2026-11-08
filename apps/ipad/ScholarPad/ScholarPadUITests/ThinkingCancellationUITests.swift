@@ -26,7 +26,7 @@ final class ThinkingCancellationUITests: XCTestCase {
         let replay = app.buttons["workspaceSyntheticVoice"]
         func nextTurn(_ number: Int) {
             if !replay.isHittable {
-                app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.9)).press(forDuration: 0.1,
+                app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.95)).press(forDuration: 0.1,
                     thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.4)))
             }
             XCTAssertTrue(replay.isHittable, app.debugDescription); replay.tap()
