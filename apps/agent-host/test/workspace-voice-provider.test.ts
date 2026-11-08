@@ -230,3 +230,26 @@ test("转写遇到连接失败间隔着最多再试两次；三次都失败才�
   await expect(offline.transcribe(Buffer.alloc(3200))).rejects.toThrow("connectionFailed");
   offline.close();
 });
+
+// 2026-11-08 真机：长录音转写超过 2 秒被判超时，再重试两次又各等 2 秒，孩子白等近 10 秒后听到“没听清”。
+test("转写超时只换连接再要一次，不像连接失败那样试第三次", async () => {
+  const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+  await new Promise<void>(r => server.once("listening", r));
+  const address = server.address(); if (!address || typeof address === "string") throw Error();
+  let connections = 0;
+  server.on("connection", ws => {
+    connections++;
+    const send = (e: object) => ws.readyState === 1 && ws.send(JSON.stringify(e));
+    send({ type: "session.created" });
+    ws.on("message", raw => {
+      const e = JSON.parse(raw.toString());
+      if (e.type === "session.update") send({ type: "session.updated" });
+      if (e.type === "input_audio_buffer.commit") send({ type: "input_audio_buffer.committed", item_id: "i" });
+    });
+  });
+  const provider = new WorkspaceVoiceProvider({ url: `ws://127.0.0.1:${address.port}`, apiKey: "synthetic", decisionMode: "realtime" }, { frameDelayMs: 0, transcribeRetryDelaysMs: [10, 10] });
+  try {
+    await expect(provider.transcribe(Buffer.alloc(3200))).rejects.toThrow("providerTimeout");
+    expect(connections).toBe(2);
+  } finally { provider.close(); for (const ws of server.clients) ws.terminate(); await new Promise<void>(r => server.close(() => r())); }
+}, 12000);

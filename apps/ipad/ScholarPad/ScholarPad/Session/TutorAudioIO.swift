@@ -164,11 +164,26 @@ final class TutorAudioIO {
         return player
     }
 
-    /// 本机合成一句短提示（不联网，云端连不上时也能说），走同一个播放节点；不算老师回复，不触发 onDrained。
+    /// 固定短句预先用老师同一个实时语音录好（apps/agent-host/scripts/make-voice-prompts.ts 生成，24k/16 位/单声道）。
+    /// 2026-11-08 真机：系统 TTS 和老师声音不一样且有破音，所以能用预录的就不现合成。
+    static let recordedPrompts: [String: String] = [
+        "嗯，我想想。": "ack-1", "好，我看看。": "ack-2", "嗯，让我想一下。": "ack-3", "好，我来看一看。": "ack-4",
+        "刚才没听清，你再说一遍好吗？": "unheard", "老师刚才没想好，你再说一遍好吗？": "unsure",
+    ]
+    static func recordedSamples(for text: String) -> [Float]? {
+        guard let name = recordedPrompts[text], let url = Bundle.main.url(forResource: name, withExtension: "pcm"),
+              let data = try? Data(contentsOf: url), data.count >= 2 else { return nil }
+        let bytes = [UInt8](data)
+        return (0..<(bytes.count / 2)).map { i in Float(Int16(bitPattern: UInt16(bytes[i * 2]) | UInt16(bytes[i * 2 + 1]) << 8)) / 32768 }
+    }
+
+    /// 本机说一句短提示（不联网，云端连不上时也能说），走同一个播放节点；不算老师回复，不触发 onDrained。
+    /// 优先放预录的老师声音；没有录好的句子才用系统合成。
     func say(_ text: String) {
+        let id = UUID(); promptID = id
+        if let samples = Self.recordedSamples(for: text) { schedulePrompt(samples, id: id); return }
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = AVSpeechSynthesisVoice(language: "zh-CN")
-        let id = UUID(); promptID = id
         let target = PromptFormat(format: format)
         synthesizer.write(utterance) { @Sendable [weak self] buffer in
             guard let pcm = buffer as? AVAudioPCMBuffer, pcm.frameLength > 0 else { return }

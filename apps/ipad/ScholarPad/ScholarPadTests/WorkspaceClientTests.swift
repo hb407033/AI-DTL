@@ -116,6 +116,16 @@ final class WorkspaceClientTests: XCTestCase {
         XCTAssertEqual(transport.sent.filter { $0["type"] as? String == "hello" }.count, 1)
         XCTAssertEqual(prompts.count, 4)
     }
+    func testEveryLocalPromptHasRecordedTeacherVoice() throws {
+        // 本机要说的每句话都应有预录文件，否则会退回系统 TTS（声音不同、曾有破音）。
+        let prompts = WorkspaceClient.acknowledgements + ["刚才没听清，你再说一遍好吗？", "老师刚才没想好，你再说一遍好吗？"]
+        for text in prompts {
+            let samples = try XCTUnwrap(TutorAudioIO.recordedSamples(for: text), text)
+            XCTAssertGreaterThan(samples.count, 24000, "\(text) 至少 1 秒")
+            XCTAssertLessThan(samples.count, 24000 * 6, "\(text) 不超过 6 秒")
+            XCTAssertGreaterThan(samples.map(abs).max() ?? 0, 0.05, "\(text) 不是静音")
+        }
+    }
     func testAcknowledgesRightAwayWhenTeacherWillReplyAndVariesWording() async throws {
         let record = try fixture(), transport = WorkspaceTestTransport()
         let client = WorkspaceClient(transportFactory: { _ in transport }); client.record = { record }

@@ -43,11 +43,14 @@ export class WorkspaceVoiceProvider {
     // 仅没有对孩子输出、没有写入教学事实的内部转写可以有界重试；教学只允许在尚未发送音频的握手阶段恢复。
     // 家里网络偶尔断几秒（2026-11-08 真机：同一句两次立即重试都失败，老师没了声音），所以间隔着多试两次。
     const delays = this.options.transcribeRetryDelaysMs ?? [400, 1200];
+    // 超时只重试一次：云端偶尔不回 ASR 时换连接再要一次有用；长录音本来就慢，反复重试只会让孩子多等几倍。
+    let timeouts = 0;
     for (let attempt = 0; ; attempt++) {
       try { return await this.run(pcm, undefined, undefined, undefined, signal, context); }
       catch (error) {
         if (attempt >= delays.length || signal?.aborted || !(error instanceof Error)
           || !["providerTimeout", "connectionFailed", "connectionClosed"].includes(error.message)) throw error;
+        if (error.message === "providerTimeout" && ++timeouts > 1) throw error;
         await new Promise(r => setTimeout(r, delays[attempt]));
         if (signal?.aborted) throw Error("aborted");
       }
@@ -192,7 +195,8 @@ export class WorkspaceVoiceProvider {
       uploadedMs = Math.round(performance.now() - started);
       if (a.teaching) await this.wait(() => a.done, signal);
       // 只接收同一个 commit item 的最终转写，不把 delta 当完成或教学授权。
-      else await this.wait(() => !!(a.item && a.transcripts.get(a.item)), signal, 2000);
+      // 等待按录音长度放宽（2026-11-08 真机：8–12 秒的话 2 秒内转不完，被当成超时）。
+      else await this.wait(() => !!(a.item && a.transcripts.get(a.item)), signal, Math.min(9000, 3000 + pcm.length / 64));
       if (!a.teaching) {
         // ASR-only 无 response.done：终态记录 completed，usage=null（不记 0）。
         this.emitUsage("transcription", "completed", null);
